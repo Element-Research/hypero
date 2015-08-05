@@ -23,7 +23,7 @@ This battery can be used to instantiate new hyper-experiments :
 hex = bat:experiment()
 ```
 
-Now we can use the Sample some hyper-parameters :
+Now we can use `hex` to sample some hyper-parameters :
 ```lua
 opt.learningRate = hex:logUniform("lr", 0.00001, 0.1)
 opt.lrDecay = hex:categorical("lr decay", {[0.8] = "linear", [0.2] = "adaptive"})
@@ -64,7 +64,6 @@ If you are motivated, you can also log a much of other metadata for you experime
 hex:updateName(xp:name())
 hex:updateHostname(dp.hostname())
 hex:updateDataset(torch.type(ds))
-hex:updatePreprocess("Standardize")
 hex:updateSavepath(paths.concat(dp.SaveDir,dp:name()..'.dat'))
 ```
 
