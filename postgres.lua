@@ -4,7 +4,7 @@
 -- Uses the ~/.pgpass file for authentication 
 -- see (http://wiki.postgresql.org/wiki/Pgpass)
 ------------------------------------------------------------------------
-local Postgres = torch.class("hp.Postgres")
+local Postgres = torch.class("hypero.Postgres")
 
 function Postgres:__init(config)
    config = config or {}
@@ -23,6 +23,7 @@ function Postgres:__init(config)
    )
    if not (database or user or host) then
       self._conn_string = os.getenv(env)
+      assert(self._conn_string, "Environment variable HYPER_PG_CONN not set")
    else
       error"NotImplementedError"
    end

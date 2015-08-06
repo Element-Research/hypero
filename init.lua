@@ -9,9 +9,10 @@ require 'torchx'
 
 
 
-local hp = {}
-   
---[[ utils ]]--
-torch.include('hp', 'postgres.lua')
+hypero = {}
 
-return hp
+torch.include('hypero', 'postgres.lua')
+torch.include('hypero', 'battery.lua')
+torch.include('hypero', 'connect.lua')
+
+return hypero

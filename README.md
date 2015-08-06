@@ -92,20 +92,22 @@ sudo apt-get install libpq-dev
 sudo luarocks install luasql-postgres PGSQL_INCDIR=/usr/include/postgresql
 ```
 
-Setup a user account :
+Setup a user account and a database:
 ```bash
 sudo su postgres
 psql postgres
 postgres=# CREATE USER "hypero" WITH ENCRYPTED PASSWORD 'mysecretpassword';
+postgres=# CREATE DATABASE hypero;
+postgres=# GRANT ALL ON DATABASE hypero TO hypero;
 postgres=# \q
 exit
 ```
 where you should replace `mysecretpassword` with your own. 
 Then you should be able to login using those credentials :
 ```bash
-psql -U hypero -W -h localhost postgres
+psql -U hypero -W -h localhost hypero
 Password for user hypero: 
-postgres=>
+hypero=>
 ```
 Now let's setup the server so that you can connect to it from any host using your username.
 You will need to add a line to `pg_hba.conf` file and change the `listen_addresses` value of 
@@ -135,9 +137,9 @@ from there. Supposing we setup our postgresql server on host 192.168.1.3 and tha
 ```bash
 $ ssh username@192.168.1.2
 $ sudo apt-get install postgresql-client
-$ psql -U hypero -W -h 192.168.1.3 postgres
+$ psql -U hypero -W -h 192.168.1.3 hypero
 Password for user hypero: 
-postgres=>
+hypero=>
 ```
 Now every time we login, we need to supply a password. 
 However, postgresql provides a simple facility for storing your passwords on disk.
@@ -150,8 +152,8 @@ $ chmod og-rwx .pgpass
 The last part is to keep other users from viewing your connection string.
 So now we can login to the database without requiring any password :
 ```bash
-$ psql -U hypero -h 192.168.1.8 postgres
-postgres=> \q
+$ psql -U hypero -h 192.168.1.3 hypero
+hypero=> \q
 ```
 You should create and secure such a `.pgpass` file for each host 
 that will need to connect to the hypero database server. 
