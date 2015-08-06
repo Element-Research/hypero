@@ -6,10 +6,11 @@
 ------------------------------------------------------------------------
 local Postgres = torch.class("hp.Postgres")
 
-function Postgres:__init(...)
+function Postgres:__init(config)
+   config = config or {}
    local args, database, user, host, env, autocommit
       = xlua.unpack(
-      {... or {}},
+      {config},
       'Postgres', 'Default is to get the connection string from an ' ..
       'environment variable. For security reasons, and to allow ' .. 
       'for its serialization, no password is accepted. The password ' ..
@@ -44,13 +45,7 @@ end
 function Postgres:execute(command, params)
    local result
    if params then
-      result = assert(
-         self._conn:execute(
-            string.format(
-               command, unpack(params)
-            )
-         )
-      )
+      result = self._conn:execute(string.format(command, unpack(params)))
    else
       result = self._conn:execute(command)
    end

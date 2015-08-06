@@ -1,4 +1,4 @@
-CREATE SCHEMA hyper;
+CREATE SCHEMA IF NOT EXISTS hyper;
 
 CREATE SEQUENCE hyper.xp_id_gen MINVALUE 0 MAXVALUE 2000000000;
 
@@ -10,10 +10,10 @@ CREATE TABLE hyper.experiment (
    PRIMARY KEY (xp_id)
 );
 
-CREATE TABLE hyper.battery (
+CREATE TABLE IF NOT EXISTS hyper.battery (
 	bat_id 		INT8 DEFAULT next_val,
 	bat_name   	VARCHAR(255),
-	PRIMARY KEY (xp_id),
+	PRIMARY KEY (bat_id),
 	UNIQUE (bat_name)
 );
 
@@ -56,8 +56,4 @@ CREATE TABLE hyper.learncurve (
 	test_val	FLOAT8,
 	PRIMARY KEY (hex_id, hex_epoch)
 );
-
-
-
-	
 

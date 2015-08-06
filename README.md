@@ -87,6 +87,7 @@ generate a .csv file, order you experiments by results, etc.
 
 You will need postgresql:
 ```bash
+sudo apt-get install postgresql
 sudo apt-get install libpq-dev
 sudo luarocks install luasql-postgres PGSQL_INCDIR=/usr/include/postgresql
 ```
@@ -108,7 +109,7 @@ postgres=>
 ```
 Now let's setup the server so that you can connect to it from any host using your username.
 You will need to add a line to `pg_hba.conf` file and change the `listen_addresses` value of 
-`postgresql.conf` file:
+`postgresql.conf` file (replace 9.3 with your postgresql version):
 ```bash
 $ sudo su postgres
 $ vim  /etc/postgresql/9.3/main/pg_hba.conf 
