@@ -82,3 +82,77 @@ end
 You can view the results of your experiments using either the query API or our scripts.
 The scripts make it easy to common things like view the learning curves of specific experiments, 
 generate a .csv file, order you experiments by results, etc.
+
+## Installation 
+
+You will need postgresql:
+```bash
+sudo apt-get install libpq-dev
+sudo luarocks install luasql-postgres PGSQL_INCDIR=/usr/include/postgresql
+```
+
+Setup a user account :
+```bash
+sudo su postgres
+psql postgres
+postgres=# CREATE USER "hypero" WITH ENCRYPTED PASSWORD 'mysecretpassword';
+postgres=# \q
+exit
+```
+where you should replace `mysecretpassword` with your own. 
+Then you should be able to login using those credentials :
+```bash
+psql -U hypero -W -h localhost postgres
+Password for user hypero: 
+postgres=>
+```
+Now let's setup the server so that you can connect to it from any host using your username.
+You will need to add a line to `pg_hba.conf` file and change the `listen_addresses` value of 
+`postgresql.conf` file:
+```bash
+$ sudo su postgres
+$ vim  /etc/postgresql/9.3/main/pg_hba.conf 
+host    all             hypero        all                md5
+$ vim /etc/postgresql/9.3/main/postgresql.conf
+...
+#------------------------------------------------------------------------------
+# CONNECTIONS AND AUTHENTICATION
+#------------------------------------------------------------------------------
+
+# - Connection Settings -
+
+listen_addresses = '*'
+...
+$ sudo service postgresql restart
+```
+These changes basically allow any host supplying the correct credentials (username and password) to 
+connect to the database which listens on port 5432 of all IP addresses of the server.
+If you want to make the system more secure (read strict), 
+you can consult the postgreSQL documentation for each of those files. 
+To test out the changes, you can ssh to a different host and try to login 
+from there. Supposing we setup our postgresql server on host 192.168.1.3 and that we ssh to 192.168.1.2 : 
+```bash
+$ ssh username@192.168.1.2
+$ sudo apt-get install postgresql-client
+$ psql -U hypero -W -h 192.168.1.3 postgres
+Password for user hypero: 
+postgres=>
+```
+Now every time we login, we need to supply a password. 
+However, postgresql provides a simple facility for storing your passwords on disk.
+We need only store a connection string in a `.pgpass` file located at the home directory:
+```bash
+$ vim ~/.pgpass
+192.168.1.3:5432:*:hypero:mysecretpassword
+$ chmod og-rwx .pgpass
+```
+The last part is to keep other users from viewing your connection string.
+So now we can login to the database without requiring any password :
+```bash
+$ psql -U hypero -h 192.168.1.8 postgres
+postgres=> \q
+```
+You should create and secure such a `.pgpass` file for each host 
+that will need to connect to the hypero database server. 
+If will make your code that much more secure. Otherwise, you would 
+need to pass around the username and password within your code.
