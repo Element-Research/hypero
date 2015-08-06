@@ -150,7 +150,7 @@ $ chmod og-rwx .pgpass
 The last part is to keep other users from viewing your connection string.
 So now we can login to the database without requiring any password :
 ```bash
-$ psql -U hypero -h 192.168.1.8 postgres
+$ psql -U hypero -h 192.168.1.3 postgres
 postgres=> \q
 ```
 You should create and secure such a `.pgpass` file for each host 
