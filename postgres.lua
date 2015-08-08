@@ -22,15 +22,18 @@ function Postgres:__init(config)
       {arg='autocommit', type='boolean', default=true}
    )
    if not (database or user or host) then
-      self._conn_string = os.getenv(env)
-      assert(self._conn_string, "Environment variable HYPER_PG_CONN not set")
+      self.connStr = os.getenv(env)
+      assert(self.connStr, "Environment variable HYPER_PG_CONN not set")
    else
-      error"NotImplementedError"
+      self.connStr = ""
+      if database then self.connStr = self.connStr.."dbname="..database.." " end
+      if user then self.connStr = self.connStr.."user="..user.." " end
+      if host then self.connStr = self.connStr.."host="..host.." " end
    end
    local env = require('luasql.postgres'):postgres()
-   self._conn = assert(env:connect(self._conn_string))
-   self._conn:setautocommit(autocommit)
-   self._autocommit = autocommit
+   self.conn = assert(env:connect(self.connStr))
+   self.conn:setautocommit(autocommit)
+   self.autocommit = autocommit
 end
    
 function Postgres:executeMany(command, param_list)
@@ -46,9 +49,9 @@ end
 function Postgres:execute(command, params)
    local result
    if params then
-      result = self._conn:execute(string.format(command, unpack(params)))
+      result = self.conn:execute(string.format(command, unpack(params)))
    else
-      result = self._conn:execute(command)
+      result = self.conn:execute(command)
    end
    return result
 end
@@ -79,17 +82,21 @@ function Postgres:fetchOne(command, params, mode)
    return row, coltypes, colnames
 end
 
+function Postgres:close()
+   self.conn:close()
+end
+
 -- These two methods allow for (de)serialization of Postgres objects:
 function Postgres:write(file)
-   file:writeObject(self._conn_string)
-   file:writeObject(self._autocommit)
+   file:writeObject(self.connStr)
+   file:writeObject(self.autocommit)
 end
 
 function Postgres:read(file, version)
-   self._conn_string = file:readObject()
-   self._autocommit = file:readObject()
+   self.connStr = file:readObject()
+   self.autocommit = file:readObject()
    local env = require('luasql.postgres'):postgres()
-   self._conn = assert(env:connect(self._conn_string))
+   self.conn = assert(env:connect(self.connStr))
 end
 
 

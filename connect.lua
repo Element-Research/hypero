@@ -13,7 +13,7 @@ function Connect:battery(name, version, description)
 end
 
 function Connect:close()
-   self.dbconn.close()
+   self.dbconn:close()
 end
 
 function Connect:create()
