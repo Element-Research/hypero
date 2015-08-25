@@ -35,10 +35,10 @@ else
 end
 ...
 ```
-Hyper-parameters are sampled one at a time. This keeps the code pretty simple. 
+Hyper-parameters are sampled one at a time. This keeps the code pretty-simple. 
 The first argument to the sampling functions are the name of the hyper-parameter 
 as it will be saved in the database. These names will also be used as 
-columns when retreving the data as a table.
+columns when later retreving the data as a table.
 
 You can also log cmd-line arguments that you would like to see included in the database:
 ```lua
@@ -59,7 +59,7 @@ hex:updateMaxima(trainAccuracy, validAccuracy, testAccuracy)
 hex:updateLearningCurve(trainCurve, validCurve, testCurve)
 ```
 
-If you are motivated, you can also log a much of other metadata for you experiment:
+If you are motivated, you can also log a bunch of other metadata for you experiment:
 ```lua
 hex:updateName(xp:name())
 hex:updateHostname(dp.hostname())
@@ -80,7 +80,7 @@ end
 ```
 
 You can view the results of your experiments using either the query API or our scripts.
-The scripts make it easy to common things like view the learning curves of specific experiments, 
+The scripts make it easy to do common things like view the learning curves of specific experiments, 
 generate a .csv file, order you experiments by results, etc.
 
 ## Installation 
@@ -130,10 +130,10 @@ $ sudo service postgresql restart
 ```
 These changes basically allow any host supplying the correct credentials (username and password) to 
 connect to the database which listens on port 5432 of all IP addresses of the server.
-If you want to make the system more secure (read strict), 
+If you want to make the system more secure (i.e. strict), 
 you can consult the postgreSQL documentation for each of those files. 
-To test out the changes, you can ssh to a different host and try to login 
-from there. Supposing we setup our postgresql server on host 192.168.1.3 and that we ssh to 192.168.1.2 : 
+To test out the changes, you can ssh to a different host and try to login from there. 
+Supposing we setup our postgresql server on host 192.168.1.3 and that we ssh to 192.168.1.2 : 
 ```bash
 $ ssh username@192.168.1.2
 $ sudo apt-get install postgresql-client
@@ -142,14 +142,14 @@ Password for user hypero:
 hypero=>
 ```
 Now every time we login, we need to supply a password. 
-However, postgresql provides a simple facility for storing your passwords on disk.
+However, postgresql provides a simple facility for storing passwords on disk.
 We need only store a connection string in a `.pgpass` file located at the home directory:
 ```bash
 $ vim ~/.pgpass
 192.168.1.3:5432:*:hypero:mysecretpassword
 $ chmod og-rwx .pgpass
 ```
-The last part is to keep other users from viewing your connection string.
+The `chmod` command is to keep other users from viewing your connection string.
 So now we can login to the database without requiring any password :
 ```bash
 $ psql -U hypero -h 192.168.1.3 hypero
