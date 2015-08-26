@@ -21,7 +21,7 @@ end
 
 function Connect:create()
    -- create the schema and tables if they don't already exist
-   self.dbconn:execute([[
+   self.dbconn:execute(string.gsub([[
    CREATE SCHEMA IF NOT EXISTS $schema$;
 
    CREATE TABLE IF NOT EXISTS $schema$.battery (
@@ -75,5 +75,5 @@ function Connect:create()
       PRIMARY KEY (hex_id, result_name),
       FOREIGN KEY (hex_id) REFERENCES $schema$.experiment (hex_id)
    );   
-   ]]:gsub("%$schema%$", self.schema))
+   ]],"%$schema%$", self.schema))
 end

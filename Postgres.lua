@@ -37,44 +37,50 @@ function Postgres:__init(config)
 end
    
 function Postgres:executeMany(command, param_list)
-   local results = {}
-   local result
+   local results, errs = {}, {}
+   local result, err
    for i, params in pairs (param_list) do
-      result = self:execute(command, params)
+      result, err = self:execute(command, params)
       table.insert(results, result)
+      table.insert(errs, err)
    end
-   return results
+   return results, errs
 end
 	
 function Postgres:execute(command, params)
-   local result
+   local result, err
    if params then
-      result = self.conn:execute(string.format(command, unpack(params)))
+      params = torch.type(params) == 'table' and params or {params}
+      result, err = self.conn:execute(string.format(command, unpack(params)))
    else
-      result = self.conn:execute(command)
+      result, err = self.conn:execute(command)
    end
-   return result
+   return result, err
 end
 
 --mode : 'n' returns rows as array, 'a' returns them as key-value
 function Postgres:fetch(command, params, mode)
    mode = mode or 'n'
-   local cur = self:execute(command, params)
-   local coltypes = cur:getcoltypes()
-   local colnames = cur:getcolnames()
-   local row = cur:fetch({}, mode)
-   local rows = {}
-   while row do
-     table.insert(rows, row)
-     row = cur:fetch({}, mode)
+   local cur, err = self:execute(command, params)
+   if cur then
+      local coltypes = cur:getcoltypes()
+      local colnames = cur:getcolnames()
+      local row = cur:fetch({}, mode)
+      local rows = {}
+      while row do
+        table.insert(rows, row)
+        row = cur:fetch({}, mode)
+      end
+      cur:close()
+      return rows, coltypes, colnames
+   else
+      return false, err
    end
-   cur:close()
-   return rows, coltypes, colnames
 end
 
 function Postgres:fetchOne(command, params, mode)
    mode = mode or 'n'
-   local cur = self:execute(command, params)
+   local cur, err = self:execute(command, params)
    if cur then
 	   local coltypes = cur:getcoltypes()
 	   local colname = cur:getcolnames()
@@ -82,7 +88,7 @@ function Postgres:fetchOne(command, params, mode)
 	   cur:close()
       return row, coltypes, colnames
    else
-      return false
+      return false, err
    end
 end
 
@@ -101,26 +107,4 @@ function Postgres:read(file, version)
    self.autocommit = file:readObject()
    local env = require('luasql.postgres'):postgres()
    self.conn = assert(env:connect(self.connStr))
-end
-
-
-local function test(pg, no_serialize)
-   local pg = pg or dp.Postgres()
-   local res = pg:execute"CREATE TABLE public.test5464 ( n INT4, v FLOAT4, s TEXT )"
-   print(res)
-   res = pg:fetchOne"SELECT * FROM public.test5464"
-   print(res)
-   local param_list = {
-      {5, 4.1, 'asdfasdf'},
-      {6, 3.5, 'asdfashhd'},
-      {6, 3.7, 'asdfashhd2'}
-   }
-   res = pg:executeMany("INSERT INTO public.test5464 VALUES (%s, %s, '%s');", param_list)
-   print(res)
-   res = pg:fetch"SELECT * FROM public.test5464 WHERE n = 6"
-   print(res)
-   if not no_serialize then
-      local pg_str = torch.serialize(pg)
-      test(torch.deserialize(pg_str), true)
-   end
 end
