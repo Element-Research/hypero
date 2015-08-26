@@ -10,12 +10,12 @@ conn = hp.connect{database='localhost', username='nicholas'}
 
 Define a new battery of experiments to run :
 ```lua
-bat = conn:battery("RNN Visual Attenion", 3, "fixed bug in Sequencer")
+bat = conn:battery("RNN Visual Attenion", "fixed bug in Sequencer")
 ```
 This allows you to group your experiments by name (in this case "RNN Visual Attention") 
 and to keep track of the different versions of the code you are using.
 The last argument is a description of the changes you made to the last version of code to obtain the new one.
-Each unique tuple of `(name, version, version-description)` is associated to its own primate key in the database.
+Each unique tuple of `(battery-name, version-description)` is associated to its own primate key in the database.
 So you can run a battery of experiments from different scripts, processes, threads, etc.
 
 This battery can be used to instantiate new hyper-experiments :
