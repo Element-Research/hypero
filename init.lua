@@ -11,8 +11,9 @@ require 'torchx'
 
 hypero = {}
 
-torch.include('hypero', 'postgres.lua')
-torch.include('hypero', 'battery.lua')
-torch.include('hypero', 'connect.lua')
+torch.include('hypero', 'Postgres.lua')
+torch.include('hypero', 'Connect.lua')
+torch.include('hypero', 'Battery.lua')
+torch.include('hypero', 'HyperExperiment.lua')
 
 return hypero

@@ -3,6 +3,7 @@ local Battery = torch.class("hypero.Battery")
 function Battery:__init(dbconn, name)
    assert(torch.type(name) == 'string')
    assert(name ~= '')
+   assert(torch.isTypeOf(dbconn, "hypero.Connect"))
    self.dbconn = dbconn
    self.name = name
    
@@ -81,3 +82,7 @@ function Battery:version(desc)
    return self.verId
 end
 
+function Battery:hyperExperiment()
+   assert(self.id, self.verId)
+   return hypero.HyperExperiment(self)
+end
