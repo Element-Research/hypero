@@ -25,10 +25,10 @@ hex = bat:experiment()
 
 Now we can use `hex` to sample some hyper-parameters :
 ```lua
-opt.learningRate = hex:logUniform("lr", 0.00001, 0.1)
+opt.learningRate = hex:logUniform("lr", math.log(0.00001), math.log(0.1))
 opt.lrDecay = hex:categorical("lr decay", {[0.8] = "linear", [0.2] = "adaptive"})
 if opt.lrDecay == 'linear' then
-	opt.minLR = hex:logUniform("min lr", opt.learninRate/1000, opt.learningRate/10)
+	opt.minLR = hex:logUniform("min lr", math.log(opt.learninRate/1000), math.log(opt.learningRate/10))
 	opt.saturateEpoch = hex:normal("saturate", 600, 200)
 else
 	...
@@ -42,12 +42,12 @@ columns when later retreving the data as a table.
 
 You can also log cmd-line arguments that you would like to see included in the database:
 ```lua
-hex:insertVarHP("channel", unpack(opt.channelSize))
-hex:insertVarHP("hidden", unpack(opt.hiddenSize))
-hex:insertHP("bs", opt.batchSize)
+hex:hyperParam("channel", opt.channelSize)
+hex:hyperParam("hidden", opt.hiddenSize)
+hex:hyperParam("bs", opt.batchSize)
 ```
 
-Run an experiment using the sampled hyper-parameters (we use dp here as an example; you can use whatever you want).
+Build and run an experiment using the sampled hyper-parameters (we use dp here as an example; you can use whatever you want).
 ```lua
 xp = buildExperiment(opt)
 xp:run(ds)
@@ -55,23 +55,31 @@ xp:run(ds)
 
 Then we need to update the server with the experiment's results :
 ```lua
-hex:updateMaxima(trainAccuracy, validAccuracy, testAccuracy)
-hex:updateLearningCurve(trainCurve, validCurve, testCurve)
+hex:resultMaxima(trainAccuracy, validAccuracy, testAccuracy)
+hex:resultLearningCurve(trainCurve, validCurve, testCurve)
 ```
 
-If you are motivated, you can also log a bunch of other metadata for you experiment:
+If you are motivated or just like to keep a log of everything, 
+you can also keep track of a bunch of metadata for you experiment:
 ```lua
-hex:updateName(xp:name())
-hex:updateHostname(dp.hostname())
-hex:updateDataset(torch.type(ds))
-hex:updateSavepath(paths.concat(dp.SaveDir,dp:name()..'.dat'))
+hex:metaName(xp:name())
+hex:metaHostname(dp.hostname())
+hex:metaDataset(torch.type(ds))
+hex:metaSavepath(paths.concat(dp.SaveDir,dp:name()..'.dat'))
+```
+which is equalivalent to :
+```lua
+hex:metaData('name', xp:name())
+hex:metaData('hostname', dp.hostname())
+hex:metaData('dataset', torch.type(ds))
+hex:metaData('savepath', paths.concat(dp.SaveDir,dp:name()..'.dat'))
 ```
 
 You can encapsulate this process in a for loop to sample multiple experiments :
 ```lua
 for i=1,opt.nHex do
 	hex = conn:experiment("RNN Visual Attenion", 3, "fixed bug in Sequencer")
-	opt.learningRate = hex:logUniform("lr", 0.00001, 0.1)
+	opt.learningRate = hex:logUniform("lr", math.log(0.00001), math.log(0.1))
 	opt.lrDecay = hex:categorical("lr decay", {[0.8] = "linear", [0.2] = "adaptive"})
 	...
 	hex:updateMaxima(trainAccuracy, validAccuracy, testAccuracy)

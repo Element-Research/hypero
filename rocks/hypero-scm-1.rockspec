@@ -24,7 +24,8 @@ dependencies = {
    "xlua >= 1.0",
    "luafilesystem >= 1.6.2",
    "sys >= 1.1",
-   "torchx >= 1.0"
+   "torchx >= 1.0",
+   "luajson >= 4"
 }
 
 

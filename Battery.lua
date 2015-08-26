@@ -82,7 +82,7 @@ function Battery:version(desc)
    return self.verId
 end
 
-function Battery:hyperExperiment()
+function Battery:experiment()
    assert(self.id, self.verId)
-   return hypero.HyperExperiment(self)
+   return hypero.Experiment(self)
 end
