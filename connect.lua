@@ -6,9 +6,9 @@ function Connect:__init(config)
 end
 hypero.connect = hypero.Connect
 
-function Connect:battery(name, version, description)
-   local bat = hypero.Battery(self.dbconn, name)
-   bat:version(version, description)
+function Connect:battery(bat_name, ver_desc)
+   local bat = hypero.Battery(self.dbconn, bat_name)
+   bat:version(ver_desc)
    return bat
 end
 
@@ -32,12 +32,11 @@ function Connect:create()
    CREATE TABLE IF NOT EXISTS hyper.version (
       ver_id 		BIGSERIAL,
       bat_id		INT8,
-      ver_num		INT8,
-      ver_time	TIMESTAMP DEFAULT now(),
       ver_desc 	VARCHAR(255),
+      ver_time	TIMESTAMP DEFAULT now(),
       PRIMARY KEY (ver_id),
       FOREIGN KEY (bat_id) REFERENCES hyper.battery (bat_id),
-      UNIQUE (bat_id, ver_num, ver_desc)
+      UNIQUE (bat_id, ver_desc)
    );
 
    CREATE TABLE IF NOT EXISTS hyper.experiment (   

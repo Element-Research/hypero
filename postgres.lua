@@ -75,11 +75,15 @@ end
 function Postgres:fetchOne(command, params, mode)
    mode = mode or 'n'
    local cur = self:execute(command, params)
-   local coltypes = cur:getcoltypes()
-   local colname = cur:getcolnames()
-   local row = cur:fetch({}, mode)
-   cur:close()
-   return row, coltypes, colnames
+   if cur then
+	   local coltypes = cur:getcoltypes()
+	   local colname = cur:getcolnames()
+	   local row = cur:fetch({}, mode)
+	   cur:close()
+      return row, coltypes, colnames
+   else
+      return false
+   end
 end
 
 function Postgres:close()
