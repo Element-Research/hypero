@@ -3,7 +3,7 @@ local Battery = torch.class("hypero.Battery")
 function Battery:__init(dbconn, name)
    assert(torch.type(name) == 'string')
    assert(name ~= '')
-   assert(torch.isTypeOf(dbconn, "hypero.Connect"))
+   assert(torch.isTypeOf(dbconn, "hypero.Postgres"))
    self.dbconn = dbconn
    self.name = name
    
@@ -12,12 +12,12 @@ function Battery:__init(dbconn, name)
    SELECT bat_id FROM hyper.battery WHERE bat_name = '%s';
    ]], {self.name})
    
-   if not self.id then
+   if not self.id or _.isEmpty(self.id) then
       print("Creating new battery : "..name)
       self.id = self.dbconn:fetchOne([[
       INSERT INTO hyper.battery (bat_name) VALUES ('%s') RETURNING bat_id;
       ]], {self.name})
-      if not self.id then
+      if not self.id or _.isEmpty(self.id)then
          self.id = self.dbconn:fetchOne([[
          SELECT bat_id FROM hyper.battery WHERE bat_name = '%s';
          ]], {self.name})
@@ -42,14 +42,14 @@ function Battery:version(desc)
       WHERE (bat_id, ver_desc) = (%s, '%s');
       ]], {self.id, self.verDesc})
       
-      if not self.verId then
+      if not self.verId or _.isEmpty(verId) then
          print("Creating new battery version : "..self.verDesc)
          
          self.verId = self.dbconn:fetchOne([[
          INSERT INTO hyper.version (bat_id, ver_desc) 
          VALUES (%s, '%s') RETURNING ver_id;
          ]], {self.id, self.verDesc})
-         if not self.verId then
+         if not self.verId or _.isEmpty(self.verId) then
             self.verId = self.dbconn:fetchOne([[
             SELECT ver_id FROM hyper.version WHERE ver_desc = '%s';
             ]], {self.verDesc})
@@ -62,7 +62,7 @@ function Battery:version(desc)
       SELECT MAX(ver_id) FROM hyper.version WHERE bat_id = %s;
       ]], {self.id})
       
-      if not self.verId then
+      if not self.verId or _.isEmpty(verId) then
          self.verDesc = self.verDesc or "Initial battery version"
          print("Creating new battery version : "..self.verDesc)
          
@@ -71,7 +71,7 @@ function Battery:version(desc)
          VALUES (%s, '%s') RETURNING ver_id;
          ]], {self.id, self.verDesc})
          
-         if not self.verId then
+         if not self.verId or _.isEmpty(self.verId) then
             self.verId = self.dbconn:fetchOne([[
             SELECT ver_id FROM hyper.version WHERE ver_desc = '%s';
             ]], {self.verDesc})
