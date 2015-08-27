@@ -4,13 +4,13 @@ function Connect:__init(config)
    self.schema = config.schema or 'hyper'
    assert(torch.type(self.schema) == 'string')
    assert(self.schema ~= '')
-   self.dbconn = hypero.Postgres(config)
+   self.dbconn = config.dbconn or hypero.Postgres(config)
    self:create()
 end
 hypero.connect = hypero.Connect
 
 function Connect:battery(batName, verDesc)
-   local bat = hypero.Battery(self.dbconn, batName)
+   local bat = hypero.Battery(self, batName)
    bat:version(verDesc)
    return bat
 end
@@ -76,4 +76,26 @@ function Connect:create()
       FOREIGN KEY (hex_id) REFERENCES $schema$.experiment (hex_id)
    );   
    ]],"%$schema%$", self.schema))
+end
+
+--[[ Decorator methods ]]--
+
+function Connect:executeMany(...)
+   return self.dbconn:executeMany(...)
+end
+
+function Connect:execute(...)
+   return self.dbconn:execute(...)
+end
+
+function Connect:fetch(...)
+   return self.dbconn:fetch(...)
+end
+
+function Connect:fetchOne(...)
+   return self.dbconn:fetchOne(...)
+end
+
+function Connect:close(...)
+   return self.dbconn:close(...)
 end

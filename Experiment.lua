@@ -1,8 +1,8 @@
 local Xp = torch.class("hypero.Experiment")
 
-function Xp:__init(dbconn, hexId)
-   self.dbconn = dbconn
-   assert(torch.isTypeOf(dbconn, "hypero.Connect"))
+function Xp:__init(conn, hexId)
+   self.conn = conn
+   assert(torch.isTypeOf(conn, "hypero.Connect"))
    
    if torch.isTypeOf(hexId, "hypero.Battery") then
       local bat = hexId
@@ -11,17 +11,17 @@ function Xp:__init(dbconn, hexId)
       assert(torch.type(verId) == 'number' or torch.type(verId) == 'string')
       assert(pcall(function() return tonumber(batId) and tonumber(verId) end))
       -- get a new experiment id 
-      self.id = self.dbconn:execute([[
-      INSERT INTO hyper.experiment (bat_id, ver_id) 
+      self.id = self.conn:execute([[
+      INSERT INTO %s.experiment (bat_id, ver_id) 
       VALUES (%s, %s) RETURNING hex_id
-      ]], {batId, verId})[1]
+      ]], {self.conn.schema, batId, verId})[1]
    else
       assert(torch.type(hexId) == 'number' or torch.type(hexId) == 'string')
       assert(pcall(function() return tonumber(hexId) end))
       self.id = hexId
-      local row = self.dbconn:fetchOne([[
-      SELECT * FROM hyper.experiment (bat_id, ver_id) WHERE hex_id = %s
-      ]], {hexId})[1]
+      local row = self.conn:fetchOne([[
+      SELECT * FROM %s.experiment (bat_id, ver_id) WHERE hex_id = %s
+      ]], {self.conn.schema, hexId})[1]
       assert(row, "Non existent experiment id :"..hexId)
    end
 end
@@ -33,10 +33,10 @@ function Xp:hyperParam(name, value)
    assert(torch.type(name) == 'string')
    if not value then
       -- get
-      local row = self.dbconn:fetchOne([[
-      SELECT param_value FROM hyper.param 
+      local row = self.conn:fetchOne([[
+      SELECT param_value FROM %s.param 
       WHERE (hex_id, param_name) = (%s, '%s')
-      ]], {self.id, name})
+      ]], {self.conn.schema, self.id, name})
       if row then
          return row[1]
       else
@@ -46,10 +46,10 @@ function Xp:hyperParam(name, value)
       -- set
       local jsonVal = json.encode.encode(value)
       -- TODO handle insert conflicts
-      self.dbconn:execute([[
-      INSERT INTO hyper.param (hex_id, param_name, param_val)
+      self.conn:execute([[
+      INSERT INTO %s.param (hex_id, param_name, param_val)
       VALUES (%s, '%s', '%s')
-      ]], {self.id, name, jsonValue})
+      ]], {self.conn.schema, self.id, name, jsonValue})
    end
 end
 
@@ -59,10 +59,10 @@ function Xp:metaData(name, value)
    assert(torch.type(name) == 'string')
    if not value then
       -- get
-      local row = self.dbconn:fetchOne([[
-      SELECT meta_value FROM hyper.metadata 
+      local row = self.conn:fetchOne([[
+      SELECT meta_value FROM %s.metadata 
       WHERE (hex_id, meta_name) = (%s, '%s')
-      ]], {self.id, name})
+      ]], {self.conn.schema, self.id, name})
       if row then
          return row[1]
       else
@@ -72,10 +72,10 @@ function Xp:metaData(name, value)
       -- set
       local jsonVal = json.encode.encode(value)
       -- TODO handle insert conflicts
-      self.dbconn:execute([[
-      INSERT INTO hyper.metadata (hex_id, meta_name, meta_val)
+      self.conn:execute([[
+      INSERT INTO %s.metadata (hex_id, meta_name, meta_val)
       VALUES (%s, '%s', '%s')
-      ]], {self.id, name, jsonValue})
+      ]], {self.conn.schema, self.id, name, jsonValue})
    end
 end
 
@@ -83,10 +83,10 @@ function Xp:result(name, value)
    assert(torch.type(name) == 'string')
    if not value then
       -- get
-      local row = self.dbconn:fetchOne([[
-      SELECT result_value FROM hyper.result 
+      local row = self.conn:fetchOne([[
+      SELECT result_value FROM %s.result 
       WHERE (hex_id, result_name) = (%s, '%s')
-      ]], {self.id, name})
+      ]], {self.conn.schema, self.id, name})
       if row then
          return row[1]
       else
@@ -96,10 +96,10 @@ function Xp:result(name, value)
       -- set
       local jsonVal = json.encode.encode(value)
       -- TODO handle insert conflicts
-      self.dbconn:execute([[
-      INSERT INTO hyper.result (hex_id, result_name, result_val)
+      self.conn:execute([[
+      INSERT INTO %s.result (hex_id, result_name, result_val)
       VALUES (%s, '%s', '%s')
-      ]], {self.id, name, jsonValue})
+      ]], {self.conn.schema, self.id, name, jsonValue})
    end
 end
 
