@@ -152,21 +152,13 @@ end
 --[[ hyper param sampling distributions ]]--
 
 -- sample from a categorical distribution
--- varDist : {[prob] = value}. 
--- e.g. varDist = {[0.1]='linear', [0.2]='exp', [0.7]='adaptive'} 
-function Xp:categorical(varName, varDist)
+function Xp:categorical(varName, varProbs, varVals)
    assert(torch.type(varName) == 'string')
    assert(torch.type(dist) == 'table')
-   local probs, vals = {}, {}
-   for prob, val in pairs(dist) do 
-      assert(torch.type(prob) == 'number')
-      table.insert(probs, prob)
-      table.insert(vals, val)
-   end
    
-   probs = torch.Tensor(probs)
+   local probs = torch.Tensor(varProbs)
    local idx = torch.multinomial(probs, 1)[1]
-   local varVal = vals[idx]
+   local varVal = varVals and varVals[idx] or idx
    
    self:hyperParam(varName, varVal)
    return varVal

@@ -174,7 +174,6 @@ function htest.Experiment()
    local val = hex:result("valid_acc")
    mytester:assert(val == 0.01)
    
-   -- 
    conn:close()
 end
 

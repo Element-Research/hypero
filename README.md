@@ -26,7 +26,7 @@ hex = bat:experiment()
 Now we can use `hex` to sample some hyper-parameters :
 ```lua
 opt.learningRate = hex:logUniform("lr", math.log(0.00001), math.log(0.1))
-opt.lrDecay = hex:categorical("lr decay", {[0.8] = "linear", [0.2] = "adaptive"})
+opt.lrDecay = hex:categorical("lr decay", {8,2}, {"linear", "adaptive"})
 if opt.lrDecay == 'linear' then
 	opt.minLR = hex:logUniform("min lr", math.log(opt.learninRate/1000), math.log(opt.learningRate/10))
 	opt.saturateEpoch = hex:normal("saturate", 600, 200)
@@ -80,10 +80,11 @@ You can encapsulate this process in a for loop to sample multiple experiments :
 for i=1,opt.nHex do
 	hex = conn:experiment("RNN Visual Attenion", 3, "fixed bug in Sequencer")
 	opt.learningRate = hex:logUniform("lr", math.log(0.00001), math.log(0.1))
-	opt.lrDecay = hex:categorical("lr decay", {[0.8] = "linear", [0.2] = "adaptive"})
+	opt.lrDecay = hex:categorical("lr decay", {8,2}, {"linear", "adaptive"})
 	...
-	hex:updateMaxima(trainAccuracy, validAccuracy, testAccuracy)
-	hex:updateLearningCurve(trainCurve, validCurve, testCurve)
+	hex:result(`train_acc`, train_acc)
+   hex:result(`valid_acc`, valid_acc)
+   hex:result(`test_acc`, test_acc)
 end
 ```
 
