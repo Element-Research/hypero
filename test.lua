@@ -38,7 +38,7 @@ function htest.Postgres()
    mytester:assert(#res == 2, "Postgres select serialize err")
    mytester:assert(#res[1] == 3, "Postgres missing columns err")
    
-   -- test serialization
+   -- test serialization/deserialization of postgres object
    local dbconn_str = torch.serialize(dbconn)
    dbconn = torch.deserialize(dbconn_str)
    
@@ -67,11 +67,30 @@ function htest.Postgres()
 end
 
 function htest.Connect()
-   local conn = hypero.connect{schema='hypero_test'}
+   local dbconn = hypero.Postgres()
+   local res, err = dbconn:execute("DROP SCHEMA IF EXISTS %s CASCADE", testSchema)
+   mytester:assert(res, "DROP SCHEMA error")
+   res, err = dbconn:execute("SELECT * FROM %s.battery", testSchema)
+   mytester:assert(not res, "Connect DROP SCHEMA not dropped err")
+   dbconn:close()
+   local conn = hypero.connect{schema=testSchema}
+   res, err = conn:execute("SELECT * FROM %s.battery", testSchema)
+   mytester:assert(res, "Connect battery TABLE err")
+   res, err = conn:execute("SELECT * FROM %s.version", testSchema)
+   mytester:assert(res, "Connect version TABLE err")
+   res, err = conn:execute("SELECT * FROM %s.experiment", testSchema)
+   mytester:assert(res, "Connect experiment TABLE err")
+   res, err = conn:execute("SELECT * FROM %s.param", testSchema)
+   mytester:assert(res, "Connect param TABLE err")
+   res, err = conn:execute("SELECT * FROM %s.metadata", testSchema)
+   mytester:assert(res, "Connect metadata TABLE err")
+   res, err = conn:execute("SELECT * FROM %s.result", testSchema)
+   mytester:assert(res, "Connect result TABLE err")
+   conn:close()
 end
 
 function htest.Battery()
-
+   
 end
 
 function htest.Experiment()
