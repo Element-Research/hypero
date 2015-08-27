@@ -11,48 +11,113 @@ cmd:text('$> th neuralnetwork.lua --batchSize 128 --momentum 0.5')
 cmd:text('Options:')
 cmd:option('--batteryName', 'hypero neural network example', "name of battery of experiments to be run")
 cmd:option('--maxHex', 100, 'maximum number of hyper-experiments to train (from this script)')
-cmd:option('--learningRate', 0.1, 'learning rate at t=0')
-cmd:option('--lrDecay', 'linear', 'type of learning rate decay : adaptive | linear | schedule | none')
-cmd:option('--minLR', 0.00001, 'minimum learning rate')
-cmd:option('--saturateEpoch', 300, 'epoch at which linear decayed LR will reach minLR')
-cmd:option('--schedule', '{}', 'learning rate schedule')
-cmd:option('--maxWait', 4, 'maximum number of epochs to wait for a new minima to be found. After that, the learning rate is decayed by decayFactor.')
-cmd:option('--decayFactor', 0.001, 'factor by which learning rate is decayed for adaptive decay.')
-cmd:option('--maxOutNorm', 1, 'max norm each layers output neuron weights')
-cmd:option('--momentum', 0, 'momentum')
-cmd:option('--hiddenSize', '', 'number of hidden units per layer')
-cmd:option('--batchSize', 32, 'number of examples per batch')
+cmd:option('--preprocess', "{16,2,1,1}", "preprocessor (or distribution thereof)"
+cmd:option('--startLR', '{0.001,1}', 'learning rate at t=0 (log-uniform {log(min), log(max)})')
+cmd:option('--minLR', '{0.001,1}', 'minimum LR = minLR*startLR (log-uniform {log(min), log(max)})')
+cmd:option('--saturateEpoch', '{300, 150}', 'epoch at which linear decayed LR will reach minLR*startLR (normal {mean, std})')
+cmd:option('--maxOutNorm', '{1,3,4,2}', 'max norm each layers output neuron weights (categorical)')
+cmd:option('--momentum', '{4,4,2}', 'momentum (categorical)')
+cmd:option('--hiddenDepth', '{0,7}', 'number of hidden layers (log-uniform {log(min), log(max)})')
+cmd:option('--hiddenSize', '{128,1024}', 'number of hidden units per layer (log-uniform {log(min), log(max)})')
+cmd:option('--batchSize', '{1,4,1}', 'number of examples per batch (categorical)')
+cmd:option('--extra' '{1,1,1}', 'apply nothing, dropout or batchNorm (categorical)')
 cmd:option('--cuda', false, 'use CUDA')
 cmd:option('--useDevice', 1, 'sets the device (GPU) to use')
-cmd:option('--maxEpoch', 100, 'maximum number of epochs to run')
-cmd:option('--maxTries', 30, 'maximum number of epochs to try to find a better local minima for early-stopping')
-cmd:option('--dropout', false, 'apply dropout on hidden neurons')
-cmd:option('--batchNorm', false, 'use batch normalization. dropout is mostly redundant with this')
-cmd:option('--preprocess', "{16,2,1,1}", "prob of using no preprocess, lcn, std or zca, respectively"
+cmd:option('--maxEpoch', 500, 'maximum number of epochs to run')
+cmd:option('--maxTries', 50, 'maximum number of epochs to try to find a better local minima for early-stopping')
 cmd:option('--progress', false, 'display progress bar')
 cmd:option('--silent', false, 'dont print anything to stdout')
 cmd:text()
-opt = cmd:parse(arg or {})
-opt.schedule = dp.returnString(opt.schedule)
-opt.hiddenSize = dp.returnString(opt.hiddenSize)
-opt.preprocess = dp.returnString(opt.preprocess)
-if not opt.silent then
-   table.print(opt)
-end
+hopt = cmd:parse(arg or {})
+hopt.schedule = dp.returnString(hopt.schedule)
+hopt.preprocess = dp.returnString(hopt.preprocess)
+hopt.startLR = dp.returnString(hopt.startLR)
+hopt.minLR = dp.returnString(hopt.minLR)
+hopt.hiddenSize = dp.returnString(hopt.hiddenSize)
+hopt.hiddenDepth = dp.returnString(hopt.hiddenDepth)
 
-opt.versionDesc = "Neural Network v1"
+hopt.versionDesc = "Neural Network v1"
 
 --[[hypero]]--
 
 conn = hypero.connect()
-bat = conn:battery(opt.batteryName, opt.versionDesc)
-hex = bat:experiment()
+bat = conn:battery(hopt.batteryName, hopt.versionDesc)
 
+function hps(param)
+   
+end
+-- loop over experiments
 for i=1,opt.maxHex do
+   collectgarbage()
+   local hex = bat:experiment()
+   local opt = _.clone(hopt) 
+   
+   --[[hyper-parameters]]--
+   if torch.type(opt.preprocess) == 'table' then
+      opt.preprocess = hex:categorical('preprocess', opt.preprocess, {'', 'lcn', 'std', 'zca'})
+   else
+      hex:hyperParam('preprocess', opt.preproc)
+   end
+      
+   if torch.type(opt.startLR) == 'table' then
+      opt.startLR = hex:logUniform('startLR', math.log(opt.startLR[1]), math.log(opt.startLR[2]))
+   else
+      hex:hyperParam('startLR', opt.startLR)
+   end
+   
+   if torch.type(opt.minLR) == 'table' then
+      opt.minLR = hex:logUniform('minLR', math.log(opt.minLR[1]), math.log(opt.minLR[2]), true)
+   end
+   opt.minLR = opt.startLR*opt.minLR
+   hex:hyperParam('minLR', opt.minLR)
+   
+   if torch.type(opt.saturateEpoch) == 'table'then
+      opt.saturateEpoch = hex:normal("satEpoch", unpack(opt.staturateEpoch))
+   else
+      hex:hyperParam('saturateEpoch', opt.saturateEpoch)
+   end
+   
+   if torch.type(opt.momentum) == 'table' then
+      opt.momentum = hex:categorical("momentum", opt.momentum, {0,0.9,0.95})
+   else
+      hex:hyperParam('momentum', opt.momentum)
+   end
+   
+   if torch.type(opt.maxOutNorm) == 'table' then
+      opt.maxOutNorm = hex:categorical("maxOutNorm", opt.maxOutNorm, {0,1,2,4})
+   else
+      hex:hyperParam('maxOutNorm', opt.maxOutNorm)
+   end
+
+   if torch.type(opt.hiddenDepth) == 'table' then 
+      opt.hiddenDepth = hex:randint("hiddenDepth", unpack(opt.hiddenDepth))
+   else
+      hex:hyperParam('hiddenDepth', opt.hiddenDepth)
+   end
+   
+   if torch.type(opt.hiddenSize) == 'table' then
+      opt.hiddenSize = hex:logUniform("hiddenSize", math.log(opt.hiddenSize[1]), math.log(opt.hiddenSize[2]))
+   else
+      hex:hyperParam('hiddenSize', opt.hiddenSize)
+   end
+   
+   if torch.type(opt.batchSize) == 'table' then
+      opt.batchSize = hex:categorical("batchSize", opt.batchSize, {16,32,64})
+   else
+      hex:hyperParam('batchSize', opt.batchSize)
+   end
+   
+   if torch.type(opt.extra) == 'table' then
+      opt.extra = hex:categorical("extra", opt.extra, {'none','dropout','batchnorm'})
+   else
+      hex:hyperParam('extra', opt.extra)
+   end
+   
+   if not opt.silent then
+      table.print(opt)
+   end
 
    --[[preprocessing]]--
-
-   opt.preprocess = hex:categorical('preproc', opt.preprocess, {'', 'lcn', 'std', 'zca'})
 
    local input_preprocess = {}
    if opt.preprocess == 'std' then
@@ -68,7 +133,7 @@ for i=1,opt.maxHex do
 
    --[[data]]--
 
-   ds = torch.checkpoint(
+   local ds = torch.checkpoint(
       paths.concat(dp.DATA_DIR,"checkpoint","mnist_"..opt.preprocess..".t7"),
       function() 
          return dp.Mnist{input_preprocess = input_preprocess} 
@@ -77,22 +142,19 @@ for i=1,opt.maxHex do
 
    --[[Model]]--
 
-   model = nn.Sequential()
+   local model = nn.Sequential()
    model:add(nn.Convert(ds:ioShapes(), 'bf')) -- to batchSize x nFeature (also type converts)
 
    -- hidden layers
    inputSize = ds:featureSize()
 
-   opt.hiddenDepth = hex:randint("hd.",0,7)
-   opt.hiddenSize = hex:logUniform("hs.", math.log(128), math.log(1024))
-
    for i=1,opt.hiddenDepth do
       model:add(nn.Linear(inputSize, opt.hiddenSize)) -- parameters
-      if opt.batchNorm then
+      if opt.extra == 'batchNorm' then
          model:add(nn.BatchNormalization(hiddenSize))
       end
       model:add(nn.Tanh())
-      if opt.dropout then
+      if opt.extra == 'dropout' then
          model:add(nn.Dropout())
       end
       inputSize = hiddenSize
@@ -105,26 +167,16 @@ for i=1,opt.maxHex do
 
    --[[Propagators]]--
 
-   if opt.lrDecay == 'adaptive' then
-      ad = dp.AdaptiveDecay{max_wait = opt.maxWait, decay_factor=opt.decayFactor}
-   elseif opt.lrDecay == 'linear' then
-      opt.decayFactor = (opt.minLR - opt.learningRate)/opt.saturateEpoch
-   end
+   -- linear decay
+   opt.decayFactor = (opt.minLR - opt.learningRate)/opt.saturateEpoch
 
-   train = dp.Optimizer{
+   local train = dp.Optimizer{
       acc_update = opt.accUpdate,
       loss = nn.ModuleCriterion(nn.ClassNLLCriterion(), nil, nn.Convert()),
       epoch_callback = function(model, report) -- called every epoch
          -- learning rate decay
          if report.epoch > 0 then
-            if opt.lrDecay == 'adaptive' then
-               opt.learningRate = opt.learningRate*ad.decay
-               ad.decay = 1
-            elseif opt.lrDecay == 'schedule' and opt.schedule[report.epoch] then
-               opt.learningRate = opt.schedule[report.epoch]
-            elseif opt.lrDecay == 'linear' then 
-               opt.learningRate = opt.learningRate + opt.decayFactor
-            end
+            opt.learningRate = opt.learningRate + opt.decayFactor
             opt.learningRate = math.max(opt.minLR, opt.learningRate)
             if not opt.silent then
                print("learningRate", opt.learningRate)
@@ -145,18 +197,18 @@ for i=1,opt.maxHex do
       sampler = dp.ShuffleSampler{batch_size = opt.batchSize},
       progress = opt.progress
    }
-   valid = dp.Evaluator{
+   local valid = dp.Evaluator{
       feedback = dp.Confusion(),  
       sampler = dp.Sampler{batch_size = opt.batchSize}
    }
-   test = dp.Evaluator{
+   local test = dp.Evaluator{
       feedback = dp.Confusion(),
       sampler = dp.Sampler{batch_size = opt.batchSize}
    }
 
    --[[Experiment]]--
 
-   xp = dp.Experiment{
+   local xp = dp.Experiment{
       model = model,
       optimizer = train,
       validator = valid,

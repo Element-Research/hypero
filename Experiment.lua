@@ -68,6 +68,8 @@ function Xp:hyperParam(name, value, update)
       elseif not cur then
          error("Experiment:hyperParam INSERT err :\n"..err)
       end
+      
+      return value
    end
 end
 
@@ -152,7 +154,7 @@ end
 --[[ hyper param sampling distributions ]]--
 
 -- sample from a categorical distribution
-function Xp:categorical(varName, varProbs, varVals)
+function Xp:categorical(varName, varProbs, varVals, nodb)
    assert(torch.type(varName) == 'string')
    assert(torch.type(dist) == 'table')
    
@@ -160,57 +162,67 @@ function Xp:categorical(varName, varProbs, varVals)
    local idx = torch.multinomial(probs, 1)[1]
    local varVal = varVals and varVals[idx] or idx
    
-   self:hyperParam(varName, varVal)
+   if not nodb then
+      self:hyperParam(varName, varVal)
+   end
    return varVal
 end
 
 -- sample from a normal distribution
-function Xp:normal(varName, varMean, varStd)
+function Xp:normal(varName, varMean, varStd, nodb)
    assert(torch.type(varName) == 'string')
    assert(torch.type(varMean) == 'number')
    assert(torch.type(varStd) == 'number')
    
    local varVal = torch.normal(varMean, varStd)
    
-   self:hyperParam(varName, varVal)
+   if not nodb then
+      self:hyperParam(varName, varVal)
+   end
    return varVal
 end
 
 -- sample from uniform distribution
-function Xp:uniform(varName, varMin, varMax)
+function Xp:uniform(varName, varMin, varMax, nodb)
    assert(torch.type(varName) == 'string')
    assert(torch.type(varMin) == 'number')
    assert(torch.type(VarMax) == 'number')
    
    local varVal = torch.uniform(varMin, varMax)
    
-   self:hyperParam(varName, varVal)
+   if not nodb then
+      self:hyperParam(varName, varVal)
+   end
    return varVar
 end
 
 -- Returns a value drawn according to exp(uniform(low, high)) 
 -- so that the logarithm of the return value is uniformly distributed.
 -- When optimizing, this variable is constrained to the interval [exp(low), exp(high)].
-function Xp:logUniform(varName, varMin, varMax)
+function Xp:logUniform(varName, varMin, varMax, nodb)
    assert(torch.type(varName) == 'string')
    assert(torch.type(varMin) == 'number')
    assert(torch.type(VarMax) == 'number')
    
    local varVal = torch.exp(torch.uniform(varMin, varMax))
    
-   self:hyperParam(varName, varVal)
+   if not nodb then
+      self:hyperParam(varName, varVal)
+   end
    return varVar
 end
 
 -- sample from uniform integer distribution
-function Xp:randint(varName, varMin, varMax)
+function Xp:randint(varName, varMin, varMax, nodb)
    assert(torch.type(varName) == 'string')
    assert(torch.type(varMin) == 'number')
    assert(torch.type(VarMax) == 'number')
    
    local varVal = math.random(varMin, varMax)
    
-   self:hyperParam(varName, varVal)
+   if not nodb then
+      self:hyperParam(varName, varVal)
+   end
    return varVar
 end 
 
