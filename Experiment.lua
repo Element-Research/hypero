@@ -11,95 +11,141 @@ function Xp:__init(conn, hexId)
       assert(torch.type(verId) == 'number' or torch.type(verId) == 'string')
       assert(pcall(function() return tonumber(batId) and tonumber(verId) end))
       -- get a new experiment id 
-      self.id = self.conn:execute([[
+      local err
+      self.id, err = self.conn:fetchOne([[
       INSERT INTO %s.experiment (bat_id, ver_id) 
       VALUES (%s, %s) RETURNING hex_id
       ]], {self.conn.schema, batId, verId})[1]
+      if not self.id then
+         error("Experiment error :\n"..err)
+      end
    else
       assert(torch.type(hexId) == 'number' or torch.type(hexId) == 'string')
       assert(pcall(function() return tonumber(hexId) end))
-      self.id = hexId
-      local row = self.conn:fetchOne([[
-      SELECT * FROM %s.experiment (bat_id, ver_id) WHERE hex_id = %s
-      ]], {self.conn.schema, hexId})[1]
-      assert(row, "Non existent experiment id :"..hexId)
+      self.id = tostring(hexId)
+      local row, err = self.conn:fetchOne([[
+      SELECT * FROM %s.experiment WHERE hex_id = %s
+      ]], {self.conn.schema, hexId})
+      assert(row, "Non existent experiment id : "..hexId)
    end
 end
 
 --[[ 3 get/set : hyperParam, metaData and results ]]--
 
 -- hyper-param get/set (SELECT/INSERT)
-function Xp:hyperParam(name, value)
+function Xp:hyperParam(name, value, update)
    assert(torch.type(name) == 'string')
    if not value then
       -- get
       local row = self.conn:fetchOne([[
-      SELECT param_value FROM %s.param 
+      SELECT param_val FROM %s.param 
       WHERE (hex_id, param_name) = (%s, '%s')
       ]], {self.conn.schema, self.id, name})
+      
       if row then
-         return row[1]
+         return json.decode.decode(row[1])
       else
-         error("Hyper Param '"..name.."' undefined for experiment "..self.id)
+         return nil, err
       end
    else
       -- set
       local jsonVal = json.encode.encode(value)
-      -- TODO handle insert conflicts
-      self.conn:execute([[
+      local cur, err = self.conn:execute([[
       INSERT INTO %s.param (hex_id, param_name, param_val)
       VALUES (%s, '%s', '%s')
-      ]], {self.conn.schema, self.id, name, jsonValue})
+      ]], {self.conn.schema, self.id, name, jsonVal})
+      
+      if update and not cur then
+         -- handle insert conflict
+         local cur, err = self.conn:execute([[
+         UPDATE %s.param 
+         SET (param_name, param_val) = ('%s', '%s')
+         WHERE hex_id = %s
+         ]], {self.conn.schema, name, jsonVal, self.id})
+         if not cur then
+            error("Experiment:hyperParam UPDATE err :\n"..err)
+         end
+      elseif not cur then
+         error("Experiment:hyperParam INSERT err :\n"..err)
+      end
    end
 end
 
 -- meta-data get/set
 -- Unlike hyper-params, metadata do/should not influence the results of the experiment.
-function Xp:metaData(name, value)
+function Xp:metaData(name, value, update)
    assert(torch.type(name) == 'string')
    if not value then
       -- get
-      local row = self.conn:fetchOne([[
-      SELECT meta_value FROM %s.metadata 
+      local row, err = self.conn:fetchOne([[
+      SELECT meta_val FROM %s.metadata 
       WHERE (hex_id, meta_name) = (%s, '%s')
       ]], {self.conn.schema, self.id, name})
+      
       if row then
-         return row[1]
+         return json.decode.decode(row[1])
       else
-         error("Meta Data '"..name.."' undefined for experiment "..self.id)
+         return nil, err
       end
    else
       -- set
       local jsonVal = json.encode.encode(value)
-      -- TODO handle insert conflicts
-      self.conn:execute([[
+      local cur, err = self.conn:execute([[
       INSERT INTO %s.metadata (hex_id, meta_name, meta_val)
       VALUES (%s, '%s', '%s')
-      ]], {self.conn.schema, self.id, name, jsonValue})
+      ]], {self.conn.schema, self.id, name, jsonVal})
+      
+      if update and not cur then
+         -- handle insert conflict
+         local cur, err = self.conn:execute([[
+         UPDATE %s.metadata 
+         SET (meta_name, meta_val) = ('%s', '%s')
+         WHERE hex_id = %s
+         ]], {self.conn.schema, name, jsonVal, self.id})
+         if not cur then
+            error("Experiment:metaData UPDATE err :\n"..err)
+         end
+      elseif not cur then
+         error("Experiment:metaData INSERT err :\n"..err)
+      end
    end
 end
 
-function Xp:result(name, value)
+function Xp:result(name, value, update)
    assert(torch.type(name) == 'string')
    if not value then
       -- get
-      local row = self.conn:fetchOne([[
-      SELECT result_value FROM %s.result 
+      local row, err = self.conn:fetchOne([[
+      SELECT result_val FROM %s.result 
       WHERE (hex_id, result_name) = (%s, '%s')
       ]], {self.conn.schema, self.id, name})
+      
       if row then
-         return row[1]
+         return json.decode.decode(row[1])
       else
-         error("Result '"..name.."' undefined for experiment "..self.id)
+         return nil, err
       end
    else
       -- set
       local jsonVal = json.encode.encode(value)
-      -- TODO handle insert conflicts
-      self.conn:execute([[
+      local cur, err = self.conn:execute([[
       INSERT INTO %s.result (hex_id, result_name, result_val)
       VALUES (%s, '%s', '%s')
-      ]], {self.conn.schema, self.id, name, jsonValue})
+      ]], {self.conn.schema, self.id, name, jsonVal})
+      
+      if update and not cur then
+         -- handle insert conflict
+         local cur, err = self.conn:execute([[
+         UPDATE %s.result 
+         SET (result_name, result_val) = ('%s', '%s')
+         WHERE hex_id = %s
+         ]], {self.conn.schema, name, jsonVal, self.id})
+         if not cur then
+            error("Experiment:result UPDATE err :\n"..err)
+         end
+      elseif not cur then
+         error("Experiment:result INSERT err :\n"..err)
+      end
    end
 end
 

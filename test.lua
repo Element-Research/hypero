@@ -90,11 +90,92 @@ function htest.Connect()
 end
 
 function htest.Battery()
-   
+   local dbconn = hypero.Postgres()
+   local res, err = dbconn:execute("DROP SCHEMA IF EXISTS %s CASCADE", testSchema)
+   mytester:assert(res, "DROP SCHEMA error")
+   local conn = hypero.connect{schema=testSchema,dbconn=dbconn}
+   local batName = "Test 22"
+   local bat = conn:battery(batName, verDesc, false)
+   mytester:assert(bat.id == '1', "Battery id err")
+   mytester:assert(bat.verId == '1', "Battery verId err")
+   mytester:assert(bat.verDesc == "Initial battery version")
+   local verDesc = "Version 33"
+   local verId2, verDesc2 = bat:version(verDesc)
+   mytester:assert(verId2 == '2', "Battery version() id err")
+   mytester:assert(verDesc2 == verDesc, "Battery version() desc err")
+   local bat = conn:battery(batName, verDesc, false)
+   mytester:assert(bat.id == '1', "Battery id err")
+   mytester:assert(bat.verId == '2', "Battery verId err")
+   res, err = conn:fetchOne("SELECT COUNT(*) FROM %s.battery", testSchema)
+   mytester:assert(res, err)
+   mytester:assert(res[1] == '1')
+   res, err = conn:fetchOne("SELECT COUNT(*) FROM %s.version", testSchema)
+   mytester:assert(res, err)
+   mytester:assert(res[1] == '2')
+   conn:close()
 end
 
 function htest.Experiment()
-
+   local dbconn = hypero.Postgres()
+   local res, err = dbconn:execute("DROP SCHEMA IF EXISTS %s CASCADE", testSchema)
+   mytester:assert(res, "DROP SCHEMA error")
+   local conn = hypero.connect{schema=testSchema,dbconn=dbconn}
+   local batName = "Test 23"
+   local bat = conn:battery(batName, verDesc, false)
+   local hex = bat:experiment()
+   mytester:assert(hex.id == '1')
+   res, err = conn:fetchOne("SELECT COUNT(*) FROM %s.experiment", testSchema)
+   mytester:assert(res, err)
+   mytester:assert(res[1] == '1')
+   local hex = hypero.Experiment(conn, 1)
+   mytester:assert(hex.id == '1')
+   res, err = conn:fetchOne("SELECT COUNT(*) FROM %s.experiment", testSchema)
+   mytester:assert(res, err)
+   mytester:assert(res[1] == '1')
+   local success = pcall(function() return hypero.Experiment(2) end)
+   mytester:assert(not success)
+   
+   -- hyperParam
+   hex:hyperParam("lr", 0.0001)
+   local res, err = conn:fetchOne([[
+   SELECT param_val FROM %s.param WHERE (hex_id, param_name) = (%s, '%s')
+   ]], {testSchema, hex.id, "lr"})
+   mytester:assert(res[1] == '0.0001')
+   local val = hex:hyperParam("lr")
+   mytester:assert(val == 0.0001)
+   mytester:assert(not pcall(function() return hex:hyperParam("lr", 0.01) end))
+   hex:hyperParam("lr", 0.01, true)
+   local val = hex:hyperParam("lr")
+   mytester:assert(val == 0.01)
+   
+   -- metaData
+   hex:metaData("hostname", 'bobby')
+   local res, err = conn:fetchOne([[
+   SELECT meta_val FROM %s.metadata WHERE (hex_id, meta_name) = (%s, '%s')
+   ]], {testSchema, hex.id, "hostname"})
+   mytester:assert(res[1] == '"bobby"')
+   local val = hex:metaData("hostname")
+   mytester:assert(val == 'bobby')
+   mytester:assert(not pcall(function() return hex:metaData("hostname", 'bobby') end))
+   hex:metaData("hostname", 'bobby', true)
+   local val = hex:metaData("hostname")
+   mytester:assert(val == 'bobby')
+   
+   -- result
+   hex:result("valid_acc", 0.0001)
+   local res, err = conn:fetchOne([[
+   SELECT result_val FROM %s.result WHERE (hex_id, result_name) = (%s, '%s')
+   ]], {testSchema, hex.id, "valid_acc"})
+   mytester:assert(res[1] == '0.0001')
+   local val = hex:result("valid_acc")
+   mytester:assert(val == 0.0001)
+   mytester:assert(not pcall(function() return hex:result("valid_acc", 0.01) end))
+   hex:result("valid_acc", 0.01, true)
+   local val = hex:result("valid_acc")
+   mytester:assert(val == 0.01)
+   
+   -- 
+   conn:close()
 end
 
 function hypero.test(tests)

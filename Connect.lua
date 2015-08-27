@@ -9,8 +9,8 @@ function Connect:__init(config)
 end
 hypero.connect = hypero.Connect
 
-function Connect:battery(batName, verDesc)
-   local bat = hypero.Battery(self, batName)
+function Connect:battery(batName, verDesc, verbose)
+   local bat = hypero.Battery(self, batName, verbose)
    bat:version(verDesc)
    return bat
 end
@@ -43,8 +43,8 @@ function Connect:create()
    );
 
    CREATE TABLE IF NOT EXISTS $schema$.experiment (   
-      hex_id      	BIGSERIAL,
-      bat_id      	INT8,
+      hex_id      BIGSERIAL,
+      bat_id      INT8,
       ver_id		INT8,
       hex_time 	TIMESTAMP DEFAULT now(),
       FOREIGN KEY (bat_id) REFERENCES $schema$.battery(bat_id),

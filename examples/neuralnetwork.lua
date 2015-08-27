@@ -27,7 +27,7 @@ cmd:option('--maxEpoch', 100, 'maximum number of epochs to run')
 cmd:option('--maxTries', 30, 'maximum number of epochs to try to find a better local minima for early-stopping')
 cmd:option('--dropout', false, 'apply dropout on hidden neurons')
 cmd:option('--batchNorm', false, 'use batch normalization. dropout is mostly redundant with this')
-cmd:option('--preprocess', "{[8]='',[0.5]='std',[0.5]='zca',[1]='lcn'}", "valid values : 'std' | 'zca' | 'lcn' | dist where dist is a table defining a categorical distribution (see default)"
+cmd:option('--preprocess', "hex:categorical('preproc', {[8]='',[0.5]='std',[0.5]='zca',[1]='lcn'})", "valid values : 'std' | 'zca' | 'lcn' | dist where dist is a table defining a categorical distribution (see default)"
 cmd:option('--progress', false, 'display progress bar')
 cmd:option('--silent', false, 'dont print anything to stdout')
 cmd:text()
@@ -48,10 +48,6 @@ bat = conn:battery(opt.batteryName, opt.versionDesc)
 hex = bat:experiment()
 
 --[[preprocessing]]--
-
-if torch.type(opt.preprocess) == 'table' then
-   opt.preprocess = hex:categorical("preproc", opt.preprocess)
-end
 
 local input_preprocess = {}
 if opt.preprocess == 'std' then
