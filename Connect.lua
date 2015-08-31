@@ -54,27 +54,24 @@ function Connect:create()
 
    CREATE TABLE IF NOT EXISTS $schema$.param (
       hex_id		INT8,
-      param_name	VARCHAR(255),
-      param_val	JSON, 
-      PRIMARY KEY (hex_id, param_name),
+      hex_param	JSON,
+      PRIMARY KEY (hex_id),
       FOREIGN KEY (hex_id) REFERENCES $schema$.experiment (hex_id)
    );
 
-   CREATE TABLE IF NOT EXISTS $schema$.metadata (
+   CREATE TABLE IF NOT EXISTS $schema$.meta (
       hex_id		INT8,
-      meta_name	VARCHAR(255),
-      meta_val 	JSON,
-      PRIMARY KEY (hex_id, meta_name),
+      hex_meta	VARCHAR(255),
+      PRIMARY KEY (hex_id),
       FOREIGN KEY (hex_id) REFERENCES $schema$.experiment (hex_id)
    );
 
    CREATE TABLE IF NOT EXISTS $schema$.result (
       hex_id		INT8,
-      result_name	VARCHAR(255),
-      result_val	JSON,
-      PRIMARY KEY (hex_id, result_name),
+      hex_result	JSON,
+      PRIMARY KEY (hex_id),
       FOREIGN KEY (hex_id) REFERENCES $schema$.experiment (hex_id)
-   );   
+   );
    ]],"%$schema%$", self.schema))
 end
 

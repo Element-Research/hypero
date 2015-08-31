@@ -112,7 +112,7 @@ function Battery:version(desc)
 end
 
 -- fetch all version ids for a battery id from db
--- or new vesions if minVerDesc is specified
+-- or new versions if minVerDesc is specified
 function Battery:fetchVersions(minVerDesc, batId)
    local batId = batId or self.id
    local rows = nil, err
@@ -158,6 +158,7 @@ end
 
 -- fetch all experiment ids for a battery id and version from db
 function Battery:fetchExperiments(verId, batId)
+   vertId = verId or self.verId
    assert(torch.type(verId) == 'string', "expecting battery version id string")
    assert(verId ~= '', "expecting battery version id string")
    local batId = batId or self.id
@@ -175,6 +176,10 @@ function Battery:fetchExperiments(verId, batId)
    else
       return nil, err
    end
+end
+
+function Battery:exportTable(config)
+   local paramNames
 end
 
 function Battery:experiment()

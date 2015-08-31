@@ -82,7 +82,7 @@ function htest.Connect()
    mytester:assert(res, "Connect experiment TABLE err")
    res, err = conn:execute("SELECT * FROM %s.param", testSchema)
    mytester:assert(res, "Connect param TABLE err")
-   res, err = conn:execute("SELECT * FROM %s.metadata", testSchema)
+   res, err = conn:execute("SELECT * FROM %s.meta", testSchema)
    mytester:assert(res, "Connect metadata TABLE err")
    res, err = conn:execute("SELECT * FROM %s.result", testSchema)
    mytester:assert(res, "Connect result TABLE err")
@@ -136,43 +136,40 @@ function htest.Experiment()
    mytester:assert(not success)
    
    -- hyperParam
-   hex:hyperParam("lr", 0.0001)
-   local res, err = conn:fetchOne([[
-   SELECT param_val FROM %s.param WHERE (hex_id, param_name) = (%s, '%s')
-   ]], {testSchema, hex.id, "lr"})
-   mytester:assert(res[1] == '0.0001')
-   local val = hex:hyperParam("lr")
-   mytester:assert(val == 0.0001)
-   mytester:assert(not pcall(function() return hex:hyperParam("lr", 0.01) end))
-   hex:hyperParam("lr", 0.01, true)
-   local val = hex:hyperParam("lr")
-   mytester:assert(val == 0.01)
+   local hp = {lr=0.0001,mom=0.9}
+   hex:setParam(hp)
+   local hp2 = hex:getParam()
+   mytester:assert(hp2.lr == 0.0001)
+   mytester:assert(hp2.mom == 0.9)
+   hp.lr = 0.01
+   mytester:assert(not pcall(function() return hex:setParam(hp) end))
+   hex:setParam(hp, true)
+   local hp2 = hex:getParam()
+   mytester:assert(hp2.lr == 0.01)
    
    -- metaData
-   hex:metaData("hostname", 'bobby')
-   local res, err = conn:fetchOne([[
-   SELECT meta_val FROM %s.metadata WHERE (hex_id, meta_name) = (%s, '%s')
-   ]], {testSchema, hex.id, "hostname"})
-   mytester:assert(res[1] == '"bobby"')
-   local val = hex:metaData("hostname")
-   mytester:assert(val == 'bobby')
-   mytester:assert(not pcall(function() return hex:metaData("hostname", 'bobby') end))
-   hex:metaData("hostname", 'bobby', true)
-   local val = hex:metaData("hostname")
-   mytester:assert(val == 'bobby')
+   local md = {hostname='bobby', screen=3463}
+   hex:setMeta(md)
+   local md2 = hex:getMeta()
+   mytester:assert(md2.hostname == 'bobby')
+   mytester:assert(md2.screen == 3463)
+   md.hostname = 'sonny'
+   mytester:assert(not pcall(function() return hex:setMeta(md) end))
+   hex:setMeta(md, true)
+   local md2 = hex:getMeta()
+   mytester:assert(md2.hostname == 'sonny')
    
    -- result
-   hex:result("valid_acc", 0.0001)
-   local res, err = conn:fetchOne([[
-   SELECT result_val FROM %s.result WHERE (hex_id, result_name) = (%s, '%s')
-   ]], {testSchema, hex.id, "valid_acc"})
-   mytester:assert(res[1] == '0.0001')
-   local val = hex:result("valid_acc")
-   mytester:assert(val == 0.0001)
-   mytester:assert(not pcall(function() return hex:result("valid_acc", 0.01) end))
-   hex:result("valid_acc", 0.01, true)
-   local val = hex:result("valid_acc")
-   mytester:assert(val == 0.01)
+   local res = {valid_acc = 0.0001, test_acc = 0.02}
+   hex:setResult(res)
+   local res2 = hex:getResult()
+   mytester:assert(res2.valid_acc == 0.0001)
+   mytester:assert(res2.test_acc == 0.02)
+   res.valid_acc = 0.01
+   mytester:assert(not pcall(function() return hex:setResult(es) end))
+   hex:setResult(res, true)
+   local res2 = hex:getResult()
+   mytester:assert(res2.valid_acc == 0.01)
    
    conn:close()
 end

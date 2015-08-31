@@ -1,4 +1,4 @@
-﻿DROP SCHEMA hyper CASCADE;
+﻿--DROP SCHEMA hyper CASCADE;
 CREATE SCHEMA IF NOT EXISTS hyper;
 
 CREATE TABLE IF NOT EXISTS hyper.battery (
@@ -32,24 +32,22 @@ CREATE TABLE IF NOT EXISTS hyper.experiment (
 
 CREATE TABLE IF NOT EXISTS hyper.param (
 	hex_id		INT8,
-	param_name	VARCHAR(255),
-	param_val	JSON, 
-	PRIMARY KEY (hex_id, param_name),
+	hex_param	JSON,
+	PRIMARY KEY (hex_id),
 	FOREIGN KEY (hex_id) REFERENCES hyper.experiment (hex_id)
 );
 
-CREATE TABLE IF NOT EXISTS hyper.metadata (
+CREATE TABLE IF NOT EXISTS hyper.meta (
 	hex_id		INT8,
-	meta_name	VARCHAR(255),
-	meta_val 	JSON,
-	PRIMARY KEY (hex_id, meta_name),
+	hex_meta	VARCHAR(255),
+	PRIMARY KEY (hex_id),
 	FOREIGN KEY (hex_id) REFERENCES hyper.experiment (hex_id)
 );
 
 CREATE TABLE IF NOT EXISTS hyper.result (
 	hex_id		INT8,
-	result_name	VARCHAR(255),
-	result_val	JSON,
-	PRIMARY KEY (hex_id, result_name),
+	hex_result	JSON,
+	PRIMARY KEY (hex_id),
 	FOREIGN KEY (hex_id) REFERENCES hyper.experiment (hex_id)
 );
+
