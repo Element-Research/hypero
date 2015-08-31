@@ -174,6 +174,21 @@ function htest.Experiment()
    conn:close()
 end
 
+function htest.Sampler()
+   local hs = hypero.Sampler()
+   local val = hs:categorical({0.001, 0.0001, 0.0001, 10000}, {1,2,3,4})
+   mytester:assert(val == 4, "Sampler err")
+   local val = hs:normal(0, 1)
+   mytester:assert(torch.type(val) == 'number')
+   local val = hs:uniform(0, 1)
+   mytester:assert(val >= 0 and val <= 1)
+   local val = hs:logUniform(0, 1)
+   mytester:assert(val >= math.exp(0) and val <= math.exp(1))
+   local val = hs:randint(1,100)
+   mytester:assert(math.floor(val) == val)
+   mytester:assert(val >= 1 and val <= 100)
+end
+
 function hypero.test(tests)
    math.randomseed(os.time())
    mytester = torch.Tester()
