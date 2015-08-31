@@ -111,6 +111,72 @@ function Battery:version(desc)
    return self.verId, self.verDesc
 end
 
+-- fetch all version ids for a battery id from db
+-- or new vesions if minVerDesc is specified
+function Battery:fetchVersions(minVerDesc, batId)
+   local batId = batId or self.id
+   local rows = nil, err
+   if minVerDesc then
+      assert(torch.type(minVerDesc) == 'string', "expecting battery version description string")
+      -- check if the version already exists
+      minVerId = self.conn:fetchOne([[
+      SELECT ver_id FROM %s.version 
+      WHERE (bat_id, ver_desc) = (%s, '%s');
+      ]], {self.conn.schema, batId, minVerDesc})
+      
+      if not minVerId or _.isEmpty(minVerId) then
+         if self.verbose then
+            print("Could not find battery version : "..minVerDesc)
+         end
+      else
+         rows, err = self.conn:fetch([[
+         SELECT distinct ver_id FROM %s.version 
+         WHERE bat_id=%s AND ver_id>=%s ORDER BY ver_id;
+         ]], {self.conn.schema, batId})
+      end
+   end
+   
+   if not minVerId or not rows then
+      if self.verbose then
+         print("Get all versions for battery id : "..batId)
+      end
+      rows, err = self.conn:fetch([[
+      SELECT distinct ver_id FROM %s.version 
+      WHERE bat_id=%s ORDER BY ver_id;
+      ]], {self.conn.schema, batId})
+   end
+
+   if rows then
+      assert(torch.type(rows) == 'table')
+      --Xp:assert(#rows == 2, "Postgres select serialize err")
+      --Xp:assert(#rows[1] == 0, "Postgres missing columns err")
+      return rows, err
+   else
+      return nil, err
+   end
+end
+
+-- fetch all experiment ids for a battery id and version from db
+function Battery:fetchExperiments(verId, batId)
+   assert(torch.type(verId) == 'string', "expecting battery version id string")
+   assert(verId ~= '', "expecting battery version id string")
+   local batId = batId or self.id
+   local rows = self.conn:fetch([[
+   SELECT distinct hex_id FROM %s.version 
+   WHERE (bat_id, ver_id) = (%s, %s);
+   ]], {self.conn.schema, batId, verId})
+
+   if rows then
+      assert(torch.type(rows) == 'table')
+      --Xp:assert(#rows == 2, "Postgres select serialize err")
+      --Xp:assert(#rows[1] == 0, "Postgres missing columns err")
+
+      return _.slice(rows, 3)
+   else
+      return nil, err
+   end
+end
+
 function Battery:experiment()
    assert(self.id, self.verId)
    return hypero.Experiment(self.conn, self)
