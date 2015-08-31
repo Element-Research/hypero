@@ -14,7 +14,7 @@ cmd:option('--maxHex', 100, 'maximum number of hyper-experiments to train (from 
 cmd:option('--preprocess', "{16,2,1,1}", "preprocessor (or distribution thereof)"
 cmd:option('--startLR', '{0.001,1}', 'learning rate at t=0 (log-uniform {log(min), log(max)})')
 cmd:option('--minLR', '{0.001,1}', 'minimum LR = minLR*startLR (log-uniform {log(min), log(max)})')
-cmd:option('--saturateEpoch', '{300, 150}', 'epoch at which linear decayed LR will reach minLR*startLR (normal {mean, std})')
+cmd:option('--satEpoch', '{300, 150}', 'epoch at which linear decayed LR will reach minLR*startLR (normal {mean, std})')
 cmd:option('--maxOutNorm', '{1,3,4,2}', 'max norm each layers output neuron weights (categorical)')
 cmd:option('--momentum', '{4,4,2}', 'momentum (categorical)')
 cmd:option('--hiddenDepth', '{0,7}', 'number of hidden layers (log-uniform {log(min), log(max)})')
@@ -42,10 +42,14 @@ hopt.versionDesc = "Neural Network v1"
 
 conn = hypero.connect()
 bat = conn:battery(hopt.batteryName, hopt.versionDesc)
+hs = hypero.Sampler()
 
-function hps(param)
-   
+-- this allows the hyper-param sampler to be bypassed via cmd-line
+function ntbl(param)
+   return torch.type(param) ~= 'table' and param
 end
+
+
 -- loop over experiments
 for i=1,opt.maxHex do
    collectgarbage()
@@ -53,65 +57,20 @@ for i=1,opt.maxHex do
    local opt = _.clone(hopt) 
    
    --[[hyper-parameters]]--
-   if torch.type(opt.preprocess) == 'table' then
-      opt.preprocess = hex:categorical('preprocess', opt.preprocess, {'', 'lcn', 'std', 'zca'})
-   else
-      hex:hyperParam('preprocess', opt.preproc)
-   end
-      
-   if torch.type(opt.startLR) == 'table' then
-      opt.startLR = hex:logUniform('startLR', math.log(opt.startLR[1]), math.log(opt.startLR[2]))
-   else
-      hex:hyperParam('startLR', opt.startLR)
-   end
+   local hp = {}
+   hp.preprocess = ntbl(opt.preprocess) or hs:categorical(opt.preprocess, {'', 'lcn', 'std', 'zca'})
+   hp.startLR = ntbl(opt.startLR) or hs:logUniform(math.log(opt.startLR[1]), math.log(opt.startLR[2]))
+   hp.minLR = (ntbl(opt.minLR) or hs:logUniform(math.log(opt.minLR[1]), math.log(opt.minLR[2])))*hp.startLR
+   hp.satEpoch = ntbl(opt.satEpoch) or hs:normal(unpack(opt.satEpoch))
+   hp.momentum = ntbl(opt.momentum) or hs:categorical(opt.momentum, {0,0.9,0.95})
+   hp.maxOutNorm = ntbl(opt.maxOutNorm) or hs:categorical(opt.maxOutNorm, {0,1,2,4})
+   hp.hiddenDepth = ntbl(opt.hiddenDepth) or hs:randint(unpack(opt.hiddenDepth))
+   hp.hiddenSize = ntbl(opt.hiddenSize) or hs:logUniform(math.log(opt.hiddenSize[1]), math.log(opt.hiddenSize[2]))
+   hp.batchSize = ntbl(opt.batchSize) or hs:categorical(opt.batchSize, {16,32,64})
+   hp.extra = ntbl(opt.extra) or hs:categorical(opt.extra, {'none','dropout','batchnorm'})
    
-   if torch.type(opt.minLR) == 'table' then
-      opt.minLR = hex:logUniform('minLR', math.log(opt.minLR[1]), math.log(opt.minLR[2]), true)
-   end
-   opt.minLR = opt.startLR*opt.minLR
-   hex:hyperParam('minLR', opt.minLR)
+   hex:hyperParam(hp)
    
-   if torch.type(opt.saturateEpoch) == 'table'then
-      opt.saturateEpoch = hex:normal("satEpoch", unpack(opt.staturateEpoch))
-   else
-      hex:hyperParam('saturateEpoch', opt.saturateEpoch)
-   end
-   
-   if torch.type(opt.momentum) == 'table' then
-      opt.momentum = hex:categorical("momentum", opt.momentum, {0,0.9,0.95})
-   else
-      hex:hyperParam('momentum', opt.momentum)
-   end
-   
-   if torch.type(opt.maxOutNorm) == 'table' then
-      opt.maxOutNorm = hex:categorical("maxOutNorm", opt.maxOutNorm, {0,1,2,4})
-   else
-      hex:hyperParam('maxOutNorm', opt.maxOutNorm)
-   end
-
-   if torch.type(opt.hiddenDepth) == 'table' then 
-      opt.hiddenDepth = hex:randint("hiddenDepth", unpack(opt.hiddenDepth))
-   else
-      hex:hyperParam('hiddenDepth', opt.hiddenDepth)
-   end
-   
-   if torch.type(opt.hiddenSize) == 'table' then
-      opt.hiddenSize = hex:logUniform("hiddenSize", math.log(opt.hiddenSize[1]), math.log(opt.hiddenSize[2]))
-   else
-      hex:hyperParam('hiddenSize', opt.hiddenSize)
-   end
-   
-   if torch.type(opt.batchSize) == 'table' then
-      opt.batchSize = hex:categorical("batchSize", opt.batchSize, {16,32,64})
-   else
-      hex:hyperParam('batchSize', opt.batchSize)
-   end
-   
-   if torch.type(opt.extra) == 'table' then
-      opt.extra = hex:categorical("extra", opt.extra, {'none','dropout','batchnorm'})
-   else
-      hex:hyperParam('extra', opt.extra)
-   end
    
    if not opt.silent then
       table.print(opt)
@@ -168,7 +127,7 @@ for i=1,opt.maxHex do
    --[[Propagators]]--
 
    -- linear decay
-   opt.decayFactor = (opt.minLR - opt.learningRate)/opt.saturateEpoch
+   opt.decayFactor = (opt.minLR - opt.learningRate)/opt.satEpoch
 
    local train = dp.Optimizer{
       acc_update = opt.accUpdate,
