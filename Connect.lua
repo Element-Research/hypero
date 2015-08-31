@@ -1,6 +1,7 @@
 local Connect = torch.class("hypero.Connect")
 
 function Connect:__init(config)
+   config = config or {}
    self.schema = config.schema or 'hyper'
    assert(torch.type(self.schema) == 'string')
    assert(self.schema ~= '')

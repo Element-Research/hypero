@@ -38,44 +38,9 @@ hopt.hiddenDepth = dp.returnString(hopt.hiddenDepth)
 
 hopt.versionDesc = "Neural Network v1"
 
---[[hypero]]--
+--[[ dp ]]--
 
-conn = hypero.connect()
-bat = conn:battery(hopt.batteryName, hopt.versionDesc)
-hs = hypero.Sampler()
-
--- this allows the hyper-param sampler to be bypassed via cmd-line
-function ntbl(param)
-   return torch.type(param) ~= 'table' and param
-end
-
-
--- loop over experiments
-for i=1,opt.maxHex do
-   collectgarbage()
-   local hex = bat:experiment()
-   local opt = _.clone(hopt) 
-   
-   --[[hyper-parameters]]--
-   local hp = {}
-   hp.preprocess = ntbl(opt.preprocess) or hs:categorical(opt.preprocess, {'', 'lcn', 'std', 'zca'})
-   hp.startLR = ntbl(opt.startLR) or hs:logUniform(math.log(opt.startLR[1]), math.log(opt.startLR[2]))
-   hp.minLR = (ntbl(opt.minLR) or hs:logUniform(math.log(opt.minLR[1]), math.log(opt.minLR[2])))*hp.startLR
-   hp.satEpoch = ntbl(opt.satEpoch) or hs:normal(unpack(opt.satEpoch))
-   hp.momentum = ntbl(opt.momentum) or hs:categorical(opt.momentum, {0,0.9,0.95})
-   hp.maxOutNorm = ntbl(opt.maxOutNorm) or hs:categorical(opt.maxOutNorm, {0,1,2,4})
-   hp.hiddenDepth = ntbl(opt.hiddenDepth) or hs:randint(unpack(opt.hiddenDepth))
-   hp.hiddenSize = ntbl(opt.hiddenSize) or hs:logUniform(math.log(opt.hiddenSize[1]), math.log(opt.hiddenSize[2]))
-   hp.batchSize = ntbl(opt.batchSize) or hs:categorical(opt.batchSize, {16,32,64})
-   hp.extra = ntbl(opt.extra) or hs:categorical(opt.extra, {'none','dropout','batchnorm'})
-   
-   hex:hyperParam(hp)
-   
-   
-   if not opt.silent then
-      table.print(opt)
-   end
-
+function buildExperiment(opt)
    --[[preprocessing]]--
 
    local input_preprocess = {}
@@ -128,7 +93,7 @@ for i=1,opt.maxHex do
 
    -- linear decay
    opt.decayFactor = (opt.minLR - opt.learningRate)/opt.satEpoch
-
+   
    local train = dp.Optimizer{
       acc_update = opt.accUpdate,
       loss = nn.ModuleCriterion(nn.ClassNLLCriterion(), nil, nn.Convert()),
@@ -166,14 +131,16 @@ for i=1,opt.maxHex do
    }
 
    --[[Experiment]]--
-
+   -- this will be used by hypero
+   local hlog = dp.HyperLog() 
+   
    local xp = dp.Experiment{
       model = model,
       optimizer = train,
       validator = valid,
       tester = test,
       observer = {
-         dp.FileLogger(),
+         hlog,
          dp.EarlyStopper{
             error_report = {'validator','feedback','confusion','accuracy'},
             maximize = true,
@@ -198,6 +165,75 @@ for i=1,opt.maxHex do
       print"Model :"
       print(model)
    end
+   
+   return xp, ds, hlog
+end
 
-   xp:run(ds)
+--[[hypero]]--
+
+conn = hypero.connect()
+bat = conn:battery(hopt.batteryName, hopt.versionDesc)
+hs = hypero.Sampler()
+
+-- this allows the hyper-param sampler to be bypassed via cmd-line
+function ntbl(param)
+   return torch.type(param) ~= 'table' and param
+end
+
+
+-- loop over experiments
+for i=1,opt.maxHex do
+   collectgarbage()
+   local hex = bat:experiment()
+   local opt = _.clone(hopt) 
+   
+   -- hyper-parameters
+   local hp = {}
+   hp.preprocess = ntbl(opt.preprocess) or hs:categorical(opt.preprocess, {'', 'lcn', 'std', 'zca'})
+   hp.startLR = ntbl(opt.startLR) or hs:logUniform(math.log(opt.startLR[1]), math.log(opt.startLR[2]))
+   hp.minLR = (ntbl(opt.minLR) or hs:logUniform(math.log(opt.minLR[1]), math.log(opt.minLR[2])))*hp.startLR
+   hp.satEpoch = ntbl(opt.satEpoch) or hs:normal(unpack(opt.satEpoch))
+   hp.momentum = ntbl(opt.momentum) or hs:categorical(opt.momentum, {0,0.9,0.95})
+   hp.maxOutNorm = ntbl(opt.maxOutNorm) or hs:categorical(opt.maxOutNorm, {0,1,2,4})
+   hp.hiddenDepth = ntbl(opt.hiddenDepth) or hs:randint(unpack(opt.hiddenDepth))
+   hp.hiddenSize = ntbl(opt.hiddenSize) or hs:logUniform(math.log(opt.hiddenSize[1]), math.log(opt.hiddenSize[2]))
+   hp.batchSize = ntbl(opt.batchSize) or hs:categorical(opt.batchSize, {16,32,64})
+   hp.extra = ntbl(opt.extra) or hs:categorical(opt.extra, {'none','dropout','batchnorm'})
+   
+   for k,v in pairs(hp) opt[k] = v end
+   
+   if not opt.silent then
+      table.print(opt)
+   end
+
+   -- build dp experiment
+   local xp, ds, hlog = buildExperiment(opt)
+   
+   -- more hyper-parameters
+   hp.seed = xp:randomSeed()
+   hex:setParam(hp)
+   
+   -- meta-data
+   local md = {}
+   md.name = xp:name()
+   md.hostname = dp.hostname()
+   md.dataset = torch.type(ds)
+   hex:setMeta(md)
+
+   -- run the experiment
+   local success = pcall(function() xp:run(ds) end )
+   
+   -- results
+   if success then
+      local success pcall(function()
+   res = {}
+   res.trainCurve = hlog:getResultByEpoch('optimizer:feedback:confusion:accuracy')
+   res.validCurve = hlog:getResultByEpoch('validator:feedback:confusion:accuracy')
+   res.testCurve = hlog:getResultByEpoch('tester:feedback:confusion:accuracy')
+   res.trainAcc = hlog:getResultAtMinima('optimizer:feedback:confusion:accuracy')
+   res.validAcc = hlog:getResultAtMinima('validator:feedback:confusion:accuracy')
+   res.testAcc = hlog:getResultAtMinima('tester:feedback:confusion:accuracy')
+   res.minimaEpoch = hlog.minimaEpoch
+   
+   hex:setResult(res)
 end
