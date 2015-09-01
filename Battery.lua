@@ -161,8 +161,8 @@ function Battery:fetchExperiments(verId, batId)
    assert(torch.type(verId) == 'string', "expecting battery version id string")
    assert(verId ~= '', "expecting battery version id string")
    local batId = batId or self.id
-   local rows = self.conn:fetch([[
-   SELECT distinct hex_id FROM %s.version 
+   local rows, err = self.conn:fetch([[
+   SELECT distinct hex_id FROM %s.experiment
    WHERE (bat_id, ver_id) = (%s, %s);
    ]], {self.conn.schema, batId, verId})
 
@@ -171,7 +171,8 @@ function Battery:fetchExperiments(verId, batId)
       --Xp:assert(#rows == 2, "Postgres select serialize err")
       --Xp:assert(#rows[1] == 0, "Postgres missing columns err")
 
-      return _.slice(rows, 3)
+      return rows, nil
+      --return _.slice(rows, 3)
    else
       return nil, err
    end
