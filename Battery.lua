@@ -170,7 +170,7 @@ function Battery:fetchExperiments(verId)
    verId = torch.type(verId) ~= 'table' and {verId} or verId
    
    local rows, err = self.conn:fetch([[
-   SELECT hex_id FROM %s.version 
+   SELECT hex_id FROM %s.experiment 
    WHERE bat_id = %s AND ver_id IN (%s);
    ]], {self.conn.schema, batId, table.concat(verId, ', ')})
    
@@ -286,8 +286,8 @@ function Battery:exportTable(config)
       orderBy = xlua.unpack(
       {config},
       'Battery:exportTable', 
-      'exports the battery of experiments as a lua table'
-      {arg='versionDesc', type='string', default=self.vesDesc,
+      'exports the battery of experiments as a lua table',
+      {arg='versionDesc', type='string', default=self.verDesc,
        help='description of version to be exported'},
       {arg='minVer', type='boolean', default=false,
        help='versionDesc specifies the minimum version to be exported'},

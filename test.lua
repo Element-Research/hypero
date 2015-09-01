@@ -174,6 +174,45 @@ function htest.Experiment()
    conn:close()
 end
 
+-- export parameters to a CSV file
+function htest.ExportCSV()
+   local dbconn = hypero.Postgres()
+   local res, err = dbconn:execute("DROP SCHEMA IF EXISTS %s CASCADE", testSchema)
+   mytester:assert(res, "DROP SCHEMA error")
+   local conn = hypero.connect{schema=testSchema,dbconn=dbconn}
+   local batName = "Test 23"
+   local bat = conn:battery(batName, verDesc, true)
+   local nExperiment = 10
+   
+   for i=1,nExperiment do
+      local hex = bat:experiment()
+      
+      -- hyperParam
+      hex:hyperParam("lr", 0.0001)
+      hex:hyperParam("momentum", 0.9)
+      
+      -- metaData
+      hex:metaData("hostname", 'bobby')
+      
+      -- result
+      hex:result("valid_acc", 0.0001)
+   end
+
+   -- get battery versions
+   local verIds, err = bat:fetchVersions()
+   print("got battery versions", verIds, err)
+
+   -- get all hyper pamameter names
+   for i=1,#verIds do
+      local verId = verIds[i][1]
+      print('get experiment for version id', verId)
+      local hexIds = bat:fetchExperiments(verId, batId)
+      print('experiments', hexIds)
+   end
+   
+   conn:close()
+end
+
 function htest.Sampler()
    local hs = hypero.Sampler()
    local val = hs:categorical({0.001, 0.0001, 0.0001, 10000}, {1,2,3,4})

@@ -54,6 +54,26 @@ function Xp:setParam(hp, update)
    return value
 end
 
+-- fetch all the hyper parameter names from db
+function Xp:fetchHyperParamNames()
+   assert(torch.type(name) == 'string')
+   local rows, err = self.conn:fetch([[
+   SELECT distinct param_name FROM %s.param 
+   WHERE hex_id = %s
+   ]], {self.conn.schema, self.id})
+
+   Xp:assert(torch.type(rows) == 'table')
+   --Xp:assert(#rows == 2, "Postgres select serialize err")
+   --Xp:assert(#rows[1] == 0, "Postgres missing columns err")
+
+   if rows then
+      -- rows = _.slice(rows, 3)
+      return rows, err
+   else
+      return nil, err
+   end
+end
+
 function Xp:getParam()
    -- get
    local row = self.conn:fetchOne([[
