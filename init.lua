@@ -10,6 +10,7 @@ require 'json'
 
 hypero = {}
 
+torch.include('hypero', 'utils.lua')
 torch.include('hypero', 'Postgres.lua')
 torch.include('hypero', 'Connect.lua')
 torch.include('hypero', 'Battery.lua')

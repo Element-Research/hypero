@@ -111,78 +111,224 @@ function Battery:version(desc)
    return self.verId, self.verDesc
 end
 
--- fetch all version ids for a battery id from db
--- or new versions if minVerDesc is specified
-function Battery:fetchVersions(minVerDesc, batId)
-   local batId = batId or self.id
-   local rows = nil, err
-   if minVerDesc then
-      assert(torch.type(minVerDesc) == 'string', "expecting battery version description string")
-      -- check if the version already exists
-      minVerId = self.conn:fetchOne([[
-      SELECT ver_id FROM %s.version 
-      WHERE (bat_id, ver_desc) = (%s, '%s');
-      ]], {self.conn.schema, batId, minVerDesc})
-      
-      if not minVerId or _.isEmpty(minVerId) then
-         if self.verbose then
-            print("Could not find battery version : "..minVerDesc)
-         end
-      else
-         rows, err = self.conn:fetch([[
-         SELECT distinct ver_id FROM %s.version 
-         WHERE bat_id=%s AND ver_id>=%s ORDER BY ver_id;
-         ]], {self.conn.schema, batId})
-      end
-   end
-   
-   if not minVerId or not rows then
-      if self.verbose then
-         print("Get all versions for battery id : "..batId)
-      end
-      rows, err = self.conn:fetch([[
-      SELECT distinct ver_id FROM %s.version 
-      WHERE bat_id=%s ORDER BY ver_id;
-      ]], {self.conn.schema, batId})
-   end
-
-   if rows then
-      assert(torch.type(rows) == 'table')
-      --Xp:assert(#rows == 2, "Postgres select serialize err")
-      --Xp:assert(#rows[1] == 0, "Postgres missing columns err")
-      return rows, err
-   else
-      return nil, err
-   end
-end
-
--- fetch all experiment ids for a battery id and version from db
-function Battery:fetchExperiments(verId, batId)
-   vertId = verId or self.verId
-   assert(torch.type(verId) == 'string', "expecting battery version id string")
-   assert(verId ~= '', "expecting battery version id string")
-   local batId = batId or self.id
-   local rows = self.conn:fetch([[
-   SELECT distinct hex_id FROM %s.version 
-   WHERE (bat_id, ver_id) = (%s, %s);
-   ]], {self.conn.schema, batId, verId})
-
-   if rows then
-      assert(torch.type(rows) == 'table')
-      --Xp:assert(#rows == 2, "Postgres select serialize err")
-      --Xp:assert(#rows[1] == 0, "Postgres missing columns err")
-
-      return _.slice(rows, 3)
-   else
-      return nil, err
-   end
-end
-
-function Battery:exportTable(config)
-   local paramNames
-end
-
+-- factory method for experiments of this battery
 function Battery:experiment()
    assert(self.id, self.verId)
    return hypero.Experiment(self.conn, self)
+end
+
+
+-- fetch all version ids from db
+-- or new versions if minVerDesc is specified
+function Battery:fetchVersions(minVerDesc)
+   local rows, err
+   if minVerDesc then
+      assert(torch.type(minVerDesc) == 'string', "expecting battery version description string")
+      -- check if the version already exists
+      local row, err = self.conn:fetchOne([[
+      SELECT ver_id FROM %s.version 
+      WHERE (bat_id, ver_desc) = (%s, '%s');
+      ]], {self.conn.schema, self.id, minVerDesc})
+      
+      if not row or _.isEmpty(row) then
+         if self.verbose then
+            print("Could not find battery version : "..minVerDesc)
+            if err then print(err) end
+         end
+      else
+         rows, err = self.conn:fetch([[
+         SELECT ver_id FROM %s.version 
+         WHERE bat_id = %s AND ver_id >= %s ORDER BY ver_id ASC;
+         ]], {self.conn.schema, self.id, row[1]})
+         
+      end
+   else
+      if self.verbose then
+         print("Get all versions for battery id : "..self.id)
+      end
+      rows, err = self.conn:fetch([[
+      SELECT ver_id FROM %s.version 
+      WHERE bat_id = %s ORDER BY ver_id ASC;
+      ]], {self.conn.schema, self.id})
+   end
+   
+   local verIds = {}
+   if rows then
+      for i,row in ipairs(rows) do
+         table.insert(verIds, row[1])
+      end
+   else
+      error("Batter:fetchVersions error : \n"..tostring(err))
+   end
+
+   return verIds
+end
+
+-- fetch all experiment ids for a battery id and version from db
+function Battery:fetchExperiments(verId)
+   verId = verId or self.verId
+   verId = torch.type(verId) ~= 'table' and {verId} or verId
+   
+   local rows, err = self.conn:fetch([[
+   SELECT hex_id FROM %s.version 
+   WHERE bat_id = %s AND ver_id IN (%s);
+   ]], {self.conn.schema, batId, table.concat(verId, ', ')})
+   
+   local hexIds = {}
+   if rows then
+      for i,row in ipairs(rows) do
+         table.insert(hexIds, row[1])
+      end
+   else
+      error("Battery:fetchExperiments error :\n"..tostring(err))
+   end
+   
+   return hexIds
+end
+
+-- get version id of version having description verDesc
+function Battery:getVerId(verDesc)
+   local row, err = self.dbconn:fetchOne([[
+   SELECT ver_id FROM %s.version 
+   WHERE (bat_id, ver_desc) = (%s, '%s')
+   ]], {self.conn.schema, self.id, verDesc})
+   
+   if not row then
+      error("Battery:getVerId err :\n"..tostring(err))
+   end
+   
+   return row[1]
+end
+
+local function db2tbl(rows, colNames)
+   local all = torch.type(colNames) == 'string' and colNames == '*'
+   colNames = torch.type(colNames) == 'table' and colNames or string.split(colNames, ',')
+   all = all or _.isEmpty(colNames)
+   if all then
+      colNames = {}
+   end
+   local colDict = {}
+   
+   local tbl = {}
+   for i=1,#rows do
+      local hexId, jsonVals = unpack(rows[i])
+      local vals = json.decode.decode(jsonVals)
+      local row = {}
+      if all then
+         for k,v in pairs(vals) do
+            if not colDict[k] then
+               colDict[k] = true
+               table.insert(colNames, k)
+            end 
+         end
+      end
+      for j,name in ipairs(colNames) do
+         row[j] = vals[name]
+      end
+      tbl[tonumber(hexId)] = row
+   end
+   return tbl, colNames
+end
+
+-- get hyper-params of experiments hexIds
+-- The output is a table of tables (rows)
+-- Each row is ordered by names (column names)
+function Battery:getParam(hexIds, names)
+   hexIds = torch.type(hexIds) == 'table' and hexIds or {hexIds}
+   local rows, err = self.conn:fetch([[
+   SELECT hex_id, hex_param FROM %s.param WHERE hex_id IN (%s)
+   ]], {self.conn.schema, hexIds})
+   
+   if not rows then
+      error("Battery:getParam err"..tostring(err))
+   end
+   
+   local tbl, names = db2tbl(rows, names or {})
+   return tbl, names
+end
+
+-- get meta-data of experiments hexIds
+function Battery:getMeta(hexIds, names)
+   hexIds = torch.type(hexIds) == 'table' and hexIds or {hexIds}
+   local rows, err = self.conn:fetch([[
+   SELECT hex_id, hex_meta FROM %s.meta WHERE hex_id IN (%s)
+   ]], {self.conn.schema, hexIds})
+   
+   if not rows then
+      error("Battery:getMeta err"..tostring(err))
+   end
+   
+   local tbl, names = db2tbl(rows, names)
+   return tbl, names
+end
+
+-- get result of experiments hexIds
+function Battery:getResult(hexIds, names)
+   hexIds = torch.type(hexIds) == 'table' and hexIds or {hexIds}
+   local rows, err = self.conn:fetch([[
+   SELECT hex_id, hex_result FROM %s.result WHERE hex_id IN (%s)
+   ]], {self.conn.schema, hexIds})
+   
+   if not rows then
+      error("Battery:getResult err"..tostring(err))
+   end
+   
+   local tbl, names = db2tbl(rows, names)
+   return tbl, names
+end
+
+-- export hyper-param, result and meta-data as a table of rows
+-- where each row is an experiment (a list of values).
+function Battery:exportTable(config)
+   config = config or {}
+   assert(type(config) == 'table', "Constructor requires key-value arguments")
+   local args, verDesc, minVer, paramNames, metaNames, resultNames, 
+      orderBy = xlua.unpack(
+      {config},
+      'Battery:exportTable', 
+      'exports the battery of experiments as a lua table'
+      {arg='versionDesc', type='string', default=self.vesDesc,
+       help='description of version to be exported'},
+      {arg='minVer', type='boolean', default=false,
+       help='versionDesc specifies the minimum version to be exported'},
+      {arg='paramNames', type='string | table', default='*',
+       help='comma separated list of hyper-param columns to retrieve'},
+      {arg='metaNames', type='string | table', default='*',
+       help='comma separated list of meta-data columns to retrieve'},
+      {arg='resultNames', type='string | table', default='*',
+       help='comma separated list of result columns to retrieve'},
+      {arg='orderBy', type='string', default='',
+       help='order by this result column'}
+   )
+   
+   local verIds
+   if verDesc == '' or verDesc == '*' or verDesc == nil then
+      verIds = self:fetchVersions()
+   elseif minVer then
+      verIds = self:fetchVersions(verDesc)
+   else
+      verIds = {self:getVersion(verDesc)}
+   end
+   assert(#verIds > 1, "no versions found") 
+   
+   local hexIds = self:fetchExperiments(verIds)
+   assert(#hexIds > 1, "no experiments found")
+   
+   local hp, hpNames = self:getParam(hexIds, paramNames)
+   local md, mdNames = self:getMeta(hexIds, metaNames)
+   local res, resNames = self:getResult(hexIds, resultNames)
+   
+   local tbl = {}
+   
+   for i, hexId in ipairs(hexIds) do
+      local row = _.clone(hp[hexId])
+      row = _.append(row, res)
+      row = _.append(row, md)
+      table.insert(row, 1, hexId)
+   end
+   
+   local colNames = {'hexId',unpack(hpNames or {})}
+   colNames = _.append(colNames, resNames)
+   colNames = _.append(colNames, mdNames)
+   return tbl, colNames
 end
