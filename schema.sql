@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS hyper.param (
 
 CREATE TABLE IF NOT EXISTS hyper.meta (
 	hex_id		INT8,
-	hex_meta	VARCHAR(255),
+	hex_meta	JSON,
 	PRIMARY KEY (hex_id),
 	FOREIGN KEY (hex_id) REFERENCES hyper.experiment (hex_id)
 );

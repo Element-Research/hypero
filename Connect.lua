@@ -62,7 +62,7 @@ function Connect:create()
 
    CREATE TABLE IF NOT EXISTS $schema$.meta (
       hex_id		INT8,
-      hex_meta	VARCHAR(255),
+      hex_meta	   JSON,
       PRIMARY KEY (hex_id),
       FOREIGN KEY (hex_id) REFERENCES $schema$.experiment (hex_id)
    );
