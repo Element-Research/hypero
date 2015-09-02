@@ -37,7 +37,8 @@ function Battery:__init(conn, name, verbose)
          end
       end
    end
-   self.id = self.id[1]
+   
+   self.id = tonumber(self.id[1])
 end
 
 -- Version requires a description (like a commit message).
@@ -78,7 +79,7 @@ function Battery:version(desc)
             end
          end
       end
-      self.verId = self.verId[1]
+      self.verId = tonumber(self.verId[1])
    elseif not self.verId then
       -- try to obtain the most recent version :
       self.verId = self.conn:fetchOne([[
@@ -107,8 +108,9 @@ function Battery:version(desc)
             end
          end
       end
-      self.verId = self.verId[1]
+      self.verId = tonumber(self.verId[1])
    end
+   
    return self.verId, self.verDesc
 end
 
@@ -156,7 +158,7 @@ function Battery:fetchVersions(minVerDesc)
    local verIds = {}
    if rows then
       for i,row in ipairs(rows) do
-         table.insert(verIds, row[1])
+         table.insert(verIds, tonumber(row[1]))
       end
    else
       error("Batter:fetchVersions error : \n"..tostring(err))
@@ -178,7 +180,7 @@ function Battery:fetchExperiments(verId)
    local hexIds = {}
    if rows then
       for i,row in ipairs(rows) do
-         table.insert(hexIds, row[1])
+         table.insert(hexIds, tonumber(row[1]))
       end
    else
       error("Battery:fetchExperiments error :\n"..tostring(err))
@@ -199,7 +201,7 @@ function Battery:getVerId(verDesc)
       error("Battery:getVerId err :\n"..tostring(err))
    end
    
-   return row[1]
+   return tonumber(row[1])
 end
 
 local function db2tbl(rows, colNames)
@@ -239,7 +241,7 @@ function Battery:getParam(hexIds, names)
    hexIds = torch.type(hexIds) == 'table' and hexIds or {hexIds}
    local rows, err = self.conn:fetch([[
    SELECT hex_id, hex_param FROM %s.param WHERE hex_id IN (%s)
-   ]], {self.conn.schema, hexIds})
+   ]], {self.conn.schema, table.concat(hexIds,', ')})
    
    if not rows then
       error("Battery:getParam err"..tostring(err))
@@ -254,7 +256,7 @@ function Battery:getMeta(hexIds, names)
    hexIds = torch.type(hexIds) == 'table' and hexIds or {hexIds}
    local rows, err = self.conn:fetch([[
    SELECT hex_id, hex_meta FROM %s.meta WHERE hex_id IN (%s)
-   ]], {self.conn.schema, hexIds})
+   ]], {self.conn.schema, table.concat(hexIds,', ')})
    
    if not rows then
       error("Battery:getMeta err"..tostring(err))
@@ -269,7 +271,7 @@ function Battery:getResult(hexIds, names)
    hexIds = torch.type(hexIds) == 'table' and hexIds or {hexIds}
    local rows, err = self.conn:fetch([[
    SELECT hex_id, hex_result FROM %s.result WHERE hex_id IN (%s)
-   ]], {self.conn.schema, hexIds})
+   ]], {self.conn.schema, table.concat(hexIds,', ')})
    
    if not rows then
       error("Battery:getResult err"..tostring(err))
@@ -285,11 +287,11 @@ function Battery:exportTable(config)
    config = config or {}
    assert(type(config) == 'table', "Constructor requires key-value arguments")
    local args, verDesc, minVer, paramNames, metaNames, resultNames, 
-      orderBy = xlua.unpack(
+      orderBy, asc = xlua.unpack(
       {config},
       'Battery:exportTable', 
       'exports the battery of experiments as a lua table',
-      {arg='versionDesc', type='string', default=self.verDesc,
+      {arg='verDesc', type='string', default=self.verDesc,
        help='description of version to be exported'},
       {arg='minVer', type='boolean', default=false,
        help='versionDesc specifies the minimum version to be exported'},
@@ -299,38 +301,70 @@ function Battery:exportTable(config)
        help='comma separated list of meta-data columns to retrieve'},
       {arg='resultNames', type='string | table', default='*',
        help='comma separated list of result columns to retrieve'},
-      {arg='orderBy', type='string', default='',
-       help='order by this result column'}
+      {arg='orderBy', type='string', default='hexId',
+       help='order by this result column'},
+      {arg='asc', type='boolean', default=true,
+       help='row ordering is ascending. False is descending.'}
    )
    
+   -- select versions
    local verIds
    if verDesc == '' or verDesc == '*' or verDesc == nil then
       verIds = self:fetchVersions()
    elseif minVer then
       verIds = self:fetchVersions(verDesc)
    else
-      verIds = {self:getVersion(verDesc)}
+      verIds = {self:getVerId(verDesc)}
    end
-   assert(#verIds > 1, "no versions found") 
+   assert(#verIds > 0, "no versions found") 
    
+   -- select experiments
    local hexIds = self:fetchExperiments(verIds)
-   assert(#hexIds > 1, "no experiments found")
+   assert(#hexIds > 0, "no experiments found")
    
+   -- select hyper-param, meta-data and result
    local hp, hpNames = self:getParam(hexIds, paramNames)
    local md, mdNames = self:getMeta(hexIds, metaNames)
    local res, resNames = self:getResult(hexIds, resultNames)
-   
+
+   -- join tables using hexId
    local tbl = {}
    
    for i, hexId in ipairs(hexIds) do
-      local row = _.clone(hp[hexId])
-      row = _.append(row, res)
-      row = _.append(row, md)
-      table.insert(row, 1, hexId)
+      local row = _.clone(hp[hexId] or {})
+      row = _.append(row, res[hexId] or {})
+      row = _.append(row, md[hexId] or {})
+      if not _.isEmpty(row) then
+         table.insert(row, 1, hexId)
+         table.insert(tbl, row)
+      end
    end
    
    local colNames = {'hexId',unpack(hpNames or {})}
    colNames = _.append(colNames, resNames)
    colNames = _.append(colNames, mdNames)
+   
+   -- orderBy 
+   if orderBy and orderBy ~= '' then
+      local colIdx = _.find(colNames, orderBy)
+      assert(colIdx, "unknown orderBy column name")
+      _.sort(tbl, function(rowA, rowB) 
+            valA, valB = rowA[colIdx], rowB[colIdx]
+            local success, rtn = pcall(function()
+                  if asc then
+                     return valA < valB
+                  else
+                     return valA > valB
+                  end
+               end)
+            if success then
+               return rtn
+            else
+               print(rtn)
+               return false
+            end
+         end)
+   end
+   
    return tbl, colNames
 end

@@ -12,17 +12,17 @@ function Xp:__init(conn, hexId)
       assert(pcall(function() return tonumber(batId) and tonumber(verId) end))
       -- get a new experiment id 
       local err
-      self.id, err = self.conn:fetchOne([[
+      local row, err = self.conn:fetchOne([[
       INSERT INTO %s.experiment (bat_id, ver_id) 
       VALUES (%s, %s) RETURNING hex_id
-      ]], {self.conn.schema, batId, verId})[1]
-      if not self.id then
+      ]], {self.conn.schema, batId, verId})
+      if not row then
          error("Experiment error :\n"..err)
       end
+      self.id = tonumber(row[1])
    else
       assert(torch.type(hexId) == 'number' or torch.type(hexId) == 'string')
-      assert(pcall(function() return tonumber(hexId) end))
-      self.id = tostring(hexId)
+      self.id = tonumber(hexId)
       local row, err = self.conn:fetchOne([[
       SELECT * FROM %s.experiment WHERE hex_id = %s
       ]], {self.conn.schema, hexId})
