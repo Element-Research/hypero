@@ -51,12 +51,13 @@ function Battery:version(desc)
       self.verDesc = desc
       
       -- check if the version already exists
-      self.verId = self.conn:fetchOne([[
+      local err
+      self.verId, err = self.conn:fetchOne([[
       SELECT ver_id FROM %s.version 
       WHERE (bat_id, ver_desc) = (%s, '%s');
       ]], {self.conn.schema, self.id, self.verDesc})
       
-      if not self.verId or _.isEmpty(verId) then
+      if not self.verId or _.isEmpty(self.verId) then
          if self.verbose then
             print("Creating new battery version : "..self.verDesc)
          end
@@ -164,7 +165,7 @@ function Battery:fetchVersions(minVerDesc)
    return verIds
 end
 
--- fetch all experiment ids for a battery id and version from db
+-- fetch all experiment ids for version(s) from db
 function Battery:fetchExperiments(verId)
    verId = verId or self.verId
    verId = torch.type(verId) ~= 'table' and {verId} or verId
@@ -172,7 +173,7 @@ function Battery:fetchExperiments(verId)
    local rows, err = self.conn:fetch([[
    SELECT hex_id FROM %s.experiment 
    WHERE bat_id = %s AND ver_id IN (%s);
-   ]], {self.conn.schema, batId, table.concat(verId, ', ')})
+   ]], {self.conn.schema, self.id, table.concat(verId, ', ')})
    
    local hexIds = {}
    if rows then
@@ -188,7 +189,8 @@ end
 
 -- get version id of version having description verDesc
 function Battery:getVerId(verDesc)
-   local row, err = self.dbconn:fetchOne([[
+   assert(torch.type(verDesc == 'string'))
+   local row, err = self.conn:fetchOne([[
    SELECT ver_id FROM %s.version 
    WHERE (bat_id, ver_desc) = (%s, '%s')
    ]], {self.conn.schema, self.id, verDesc})

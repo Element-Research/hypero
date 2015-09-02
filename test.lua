@@ -95,7 +95,7 @@ function htest.Battery()
    mytester:assert(res, "DROP SCHEMA error")
    local conn = hypero.connect{schema=testSchema,dbconn=dbconn}
    local batName = "Test 22"
-   local bat = conn:battery(batName, verDesc, false)
+   local bat = conn:battery(batName, nil, false)
    mytester:assert(bat.id == '1', "Battery id err")
    mytester:assert(bat.verId == '1', "Battery verId err")
    mytester:assert(bat.verDesc == "Initial battery version")
@@ -112,6 +112,41 @@ function htest.Battery()
    res, err = conn:fetchOne("SELECT COUNT(*) FROM %s.version", testSchema)
    mytester:assert(res, err)
    mytester:assert(res[1] == '2')
+   
+   local verIds = bat:fetchVersions()
+   mytester:assert(#verIds == 2)
+   mytester:assertTableEq(verIds, {'1', '2'})
+   bat:version("Version 34")
+   local verIds = bat:fetchVersions("Version 33")
+   mytester:assert(#verIds == 2)
+   mytester:assertTableEq(verIds, {'2', '3'})
+   
+   local verId = bat:getVerId("Version 33")
+   mytester:assert(verId == '2')
+   
+   for j, verDesc in ipairs{'Version 35', 'Version 36'} do 
+      bat:version(verDesc)
+      
+      -- create some dummy experiments
+      for i=1,10 do
+         local hex = bat:experiment()
+         hex:setParam{lr=0.0001,mom=0.9, i=i, v=verDesc}
+         hex:setMeta{hostname='bobby', screen=3463, i=i, v=verDesc}
+         hex:setResult{valid_acc = 0.0001, test_acc = 0.02, i=i, v=verDesc}
+      end
+      
+      local res, err = conn:fetch([[
+      SELECT hex_id FROM %s.experiment 
+      WHERE (bat_id, ver_id) = (%s, %s)
+      ]], {testSchema, bat.id, bat.verId})
+      mytester:assert(res, err)
+      mytester:assert(#res == 10)
+   end
+   
+   local verIds = bat:fetchVersions("Version 33")
+   local hexIds = bat:fetchExperiments(verIds)
+   mytester:assert(#hexIds == 20)
+   
    conn:close()
 end
 
