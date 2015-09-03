@@ -10,9 +10,9 @@ function Connect:__init(config)
 end
 hypero.connect = hypero.Connect
 
-function Connect:battery(batName, verDesc, verbose)
-   local bat = hypero.Battery(self, batName, verbose)
-   bat:version(verDesc)
+function Connect:battery(batName, verDesc, verbose, strict)
+   local bat = hypero.Battery(self, batName, verbose, strict)
+   bat:version(verDesc, strict)
    return bat
 end
 

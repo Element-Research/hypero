@@ -4,7 +4,7 @@
 ------------------------------------------------------------------------
 local Battery = torch.class("hypero.Battery")
 
-function Battery:__init(conn, name, verbose)
+function Battery:__init(conn, name, verbose, strict)
    assert(torch.type(name) == 'string')
    assert(name ~= '')
    assert(torch.isTypeOf(conn, "hypero.Connect"))
@@ -13,65 +13,72 @@ function Battery:__init(conn, name, verbose)
    self.verbose = (verbose == nil) and true or verbose
    
    -- check if the battery already exists
-   self.id = self.conn:fetchOne([[
+   local row, err = self.conn:fetchOne([[
    SELECT bat_id FROM %s.battery WHERE bat_name = '%s';
    ]], {self.conn.schema, self.name})
    
-   if not self.id or _.isEmpty(self.id) then
+   if (not row or _.isEmpty(row)) then
+      if strict then
+         error"Battery doesn't exist (create it with strict=false)"
+      end
       if self.verbose then
          print("Creating new battery : "..name)
       end
-      self.id = self.conn:fetchOne([[
+      row, err = self.conn:fetchOne([[
       INSERT INTO %s.battery (bat_name) VALUES ('%s') RETURNING bat_id;
       ]], {self.conn.schema, self.name})
       
-      if not self.id or _.isEmpty(self.id) then
+      if not row or _.isEmpty(row) then
          -- this can happen when multiple clients try to INSERT
          -- the same battery simultaneously
-         local err
-         self.id, err = self.conn:fetchOne([[
+         local row, err = self.conn:fetchOne([[
          SELECT bat_id FROM %s.battery WHERE bat_name = '%s';
          ]], {self.conn.schema, self.name})
-         if not self.id then
+         if not row then
             error("Battery init error : \n"..err)
          end
       end
    end
    
-   self.id = tonumber(self.id[1])
+   self.id = tonumber(row[1])
 end
 
 -- Version requires a description (like a commit message).
 -- A battery can have multiple versions.
 -- Each code change could have its own battery version.
-function Battery:version(desc)
+function Battery:version(desc, strict)
+   if torch.type(desc) == 'string' and desc == '' then 
+      desc = nil 
+   end
+   
    if desc then
       -- identify version using description desc :
       assert(torch.type(desc) == 'string', "expecting battery version description string")
-      assert(desc ~= '')
       self.verDesc = desc
       
       -- check if the version already exists
-      local err
-      self.verId, err = self.conn:fetchOne([[
+      local row, err = self.conn:fetchOne([[
       SELECT ver_id FROM %s.version 
       WHERE (bat_id, ver_desc) = (%s, '%s');
       ]], {self.conn.schema, self.id, self.verDesc})
       
-      if not self.verId or _.isEmpty(self.verId) then
+      if not row or _.isEmpty(row) then
+         if strict then
+            error"Battery version doesn't exist (create it with strict=false)"
+         end
          if self.verbose then
             print("Creating new battery version : "..self.verDesc)
          end
-         self.verId = self.conn:fetchOne([[
+         row, err = self.conn:fetchOne([[
          INSERT INTO %s.version (bat_id, ver_desc) 
          VALUES (%s, '%s') RETURNING ver_id;
          ]], {self.conn.schema, self.id, self.verDesc})
          
-         if not self.verId or _.isEmpty(self.verId) then
+         if not row or _.isEmpty(row) then
             -- this can happen when multiple clients try to INSERT
             -- the same version simultaneously
             local err
-            self.verId, err = self.conn:fetchOne([[
+            row, err = self.conn:fetchOne([[
             SELECT ver_id FROM %s.version WHERE ver_desc = '%s';
             ]], {self.conn.schema, self.verDesc})
             if not self.id then
@@ -79,36 +86,38 @@ function Battery:version(desc)
             end
          end
       end
-      self.verId = tonumber(self.verId[1])
+      self.verId = tonumber(row[1])
    elseif not self.verId then
       -- try to obtain the most recent version :
-      self.verId = self.conn:fetchOne([[
-      SELECT MAX(ver_id) FROM hyper.version WHERE bat_id = %s;
-      ]], {self.id})
+      local row, err = self.conn:fetchOne([[
+      SELECT MAX(ver_id) FROM %s.version WHERE bat_id = %s;
+      ]], {self.conn.schema, self.id})
       
-      if not self.verId or _.isEmpty(verId) then
+      if not row or _.isEmpty(row) then
+         if strict then
+            error"Battery version not initialized (create it with strict=false)"
+         end
          self.verDesc = self.verDesc or "Initial battery version"
          if self.verbose then
             print("Creating new battery version : "..self.verDesc)
          end
-         self.verId = self.conn:fetchOne([[
+         row, err = self.conn:fetchOne([[
          INSERT INTO %s.version (bat_id, ver_desc) 
          VALUES (%s, '%s') RETURNING ver_id;
          ]], {self.conn.schema, self.id, self.verDesc})
          
-         if not self.verId or _.isEmpty(self.verId) then
+         if not row or _.isEmpty(row) then
             -- this can happen when multiple clients try to INSERT
             -- the same version simultaneously
-            local err
-            self.verId, err = self.conn:fetchOne([[
+            local row, err = self.conn:fetchOne([[
             SELECT ver_id FROM %s.version WHERE ver_desc = '%s';
             ]], {self.conn.schema, self.verDesc})
-            if not self.id then
+            if not row then
                error("Battery version error : \n"..err)
             end
          end
       end
-      self.verId = tonumber(self.verId[1])
+      self.verId = tonumber(row[1])
    end
    
    return self.verId, self.verDesc
@@ -146,9 +155,6 @@ function Battery:fetchVersions(minVerDesc)
          
       end
    else
-      if self.verbose then
-         print("Get all versions for battery id : "..self.id)
-      end
       rows, err = self.conn:fetch([[
       SELECT ver_id FROM %s.version 
       WHERE bat_id = %s ORDER BY ver_id ASC;
@@ -324,25 +330,31 @@ function Battery:exportTable(config)
    
    -- select hyper-param, meta-data and result
    local hp, hpNames = self:getParam(hexIds, paramNames)
-   local md, mdNames = self:getMeta(hexIds, metaNames)
    local res, resNames = self:getResult(hexIds, resultNames)
-
+   local md, mdNames = self:getMeta(hexIds, metaNames)
+   
    -- join tables using hexId
    local tbl = {}
+   local names = {hpNames, resNames, mdNames}
    
    for i, hexId in ipairs(hexIds) do
-      local row = _.clone(hp[hexId] or {})
-      row = _.append(row, res[hexId] or {})
-      row = _.append(row, md[hexId] or {})
+      local hp, res, md = hp[hexId], res[hexId], md[hexId]
+      local row = {}
+      local offset = 0
+      for i,subtbl in ipairs{hp, res, md} do
+         for k,v in pairs(subtbl) do
+            row[k+offset] = v
+         end
+         offset = offset + #names[i]
+      end
       if not _.isEmpty(row) then
          table.insert(row, 1, hexId)
          table.insert(tbl, row)
       end
    end
    
-   local colNames = {'hexId',unpack(hpNames or {})}
-   colNames = _.append(colNames, resNames)
-   colNames = _.append(colNames, mdNames)
+   local colNames = _.flatten(names)
+   table.insert(colNames, 1, 'hexId')
    
    -- orderBy 
    if orderBy and orderBy ~= '' then

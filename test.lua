@@ -90,12 +90,13 @@ function htest.Connect()
 end
 
 function htest.Battery()
+   local verbose = false
    local dbconn = hypero.Postgres()
    local res, err = dbconn:execute("DROP SCHEMA IF EXISTS %s CASCADE", testSchema)
    mytester:assert(res, "DROP SCHEMA error")
    local conn = hypero.connect{schema=testSchema,dbconn=dbconn}
    local batName = "Test 22"
-   local bat = conn:battery(batName, nil, false)
+   local bat = conn:battery(batName, nil, verbose)
    mytester:assert(bat.id == 1, "Battery id err")
    mytester:assert(bat.verId == 1, "Battery verId err")
    mytester:assert(bat.verDesc == "Initial battery version")
@@ -103,7 +104,7 @@ function htest.Battery()
    local verId2, verDesc2 = bat:version(verDesc)
    mytester:assert(verId2 == 2, "Battery version() id err")
    mytester:assert(verDesc2 == verDesc, "Battery version() desc err")
-   local bat = conn:battery(batName, verDesc, false)
+   local bat = conn:battery(batName, verDesc, verbose)
    mytester:assert(bat.id == 1, "Battery id err")
    mytester:assert(bat.verId == 2, "Battery verId err")
    res, err = conn:fetchOne("SELECT COUNT(*) FROM %s.battery", testSchema)
@@ -248,45 +249,6 @@ function htest.Experiment()
    hex:setResult(res, true)
    local res2 = hex:getResult()
    mytester:assert(res2.valid_acc == 0.01)
-   
-   conn:close()
-end
-
--- export parameters to a CSV file
-function htest.ExportCSV()
-   local dbconn = hypero.Postgres()
-   local res, err = dbconn:execute("DROP SCHEMA IF EXISTS %s CASCADE", testSchema)
-   mytester:assert(res, "DROP SCHEMA error")
-   local conn = hypero.connect{schema=testSchema,dbconn=dbconn}
-   local batName = "Test 23"
-   local bat = conn:battery(batName, verDesc, true)
-   local nExperiment = 10
-   
-   for i=1,nExperiment do
-      local hex = bat:experiment()
-      
-      -- hyperParam
-      hex:hyperParam("lr", 0.0001)
-      hex:hyperParam("momentum", 0.9)
-      
-      -- metaData
-      hex:metaData("hostname", 'bobby')
-      
-      -- result
-      hex:result("valid_acc", 0.0001)
-   end
-
-   -- get battery versions
-   local verIds, err = bat:fetchVersions()
-   print("got battery versions", verIds, err)
-
-   -- get all hyper pamameter names
-   for i=1,#verIds do
-      local verId = verIds[i][1]
-      print('get experiment for version id', verId)
-      local hexIds = bat:fetchExperiments(verId, batId)
-      print('experiments', hexIds)
-   end
    
    conn:close()
 end
