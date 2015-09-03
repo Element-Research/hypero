@@ -1,14 +1,19 @@
 # Tutorial
 
-This is a brief tutorial on how to use *hypero*.
+This is a brief tutorial on how to use *hypero*. 
+We demonstrate how the library can be used to log experiments,
+sample hyper-parameters, and query the database for analysing results.
 
 ## Connect
 
 Let's start off by connecting to the database server :
+
 ```lua
-hp = require 'hypero'
-conn = hp.connect{database='localhost', username='nicholas'}
+require 'hypero'
+conn = hypero.connect{database='localhost', username='nicholas'}
 ```
+
+The `conn` variable is a `Connect` instance.
 
 ## Battery 
 
@@ -71,6 +76,115 @@ to JSON, so only primitive types like `nil`, `string`,
 `table` and `number` can be nested within the table.
 
 ## Sampler 
+
+The above example, we didn't really sample anything. 
+That is because the database (i.e. centralized persistent storage) aspect of the 
+library was separated from the hyper-parameter sampling.
+For sampling you can basically use what you want, 
+but we provide a `Sampler` object with different sampling distribution methods.
+Example :
+
+```lua
+hs = hypero.Sampler()
+hp = {}
+hp.preprocess = hs:categorical({0.8,0.1,0.1}, {'', 'lcn', 'std'})
+hp.startLR = hs:logUniform(math.log(0.1), math.log(0.00001))
+hp.minLR = math.min(hs:logUniform(math.log(0.1)), math.log(0.0001))*hp.startLR, 0.000001)
+hp.satEpoch = hs:normal(300, 200)
+hp.hiddenDepth = hs:randint(1, 7)
+```
+
+What did we create a `Sampler` class for this? 
+Well you never know, maybe someday, we will have a Sampler 
+subclass that will use a Gaussian Process 
+or something to optimize the sampling of hyper-parameters.
+
+Again, if you want to store the hyper-parameters in the database, it's as easy as :
+
+```lua
+hex:setParam(hp)
+```
+
+## Training Script
+
+If we have a bunch of GPUs or CPUs lying around, we can create 
+a training script that loops over different experiments.
+Each experiment can be logged into the database using `hypero`.
+For a complete example for how this is done, please consult this 
+[example training script](../examples/neuralnetwork.lua).
+The main part of it that is concerned by hypero is this :
+
+```lua
+...
+-- loop over experiments
+for i=1,hopt.maxHex do
+   collectgarbage()
+   local hex = bat:experiment()
+   local opt = _.clone(hopt) 
+   
+   -- hyper-parameters
+   local hp = {}
+   hp.preprocess = ntbl(opt.preprocess) or hs:categorical(opt.preprocess, {'', 'lcn', 'std'})
+   hp.startLR = ntbl(opt.startLR) or hs:logUniform(math.log(opt.startLR[1]), math.log(opt.startLR[2]))
+   hp.minLR = (ntbl(opt.minLR) or hs:logUniform(math.log(opt.minLR[1]), math.log(opt.minLR[2])))*hp.startLR
+   hp.satEpoch = ntbl(opt.satEpoch) or hs:normal(unpack(opt.satEpoch))
+   hp.momentum = ntbl(opt.momentum) or hs:categorical(opt.momentum, {0,0.9,0.95})
+   hp.maxOutNorm = ntbl(opt.maxOutNorm) or hs:categorical(opt.maxOutNorm, {0,1,2,4})
+   hp.hiddenDepth = ntbl(opt.hiddenDepth) or hs:randint(unpack(opt.hiddenDepth))
+   hp.hiddenSize = ntbl(opt.hiddenSize) or math.round(hs:logUniform(math.log(opt.hiddenSize[1]), math.log(opt.hiddenSize[2])))
+   hp.batchSize = ntbl(opt.batchSize) or hs:categorical(opt.batchSize, {16,32,64})
+   hp.extra = ntbl(opt.extra) or hs:categorical(opt.extra, {'none','dropout','batchnorm'})
+   
+   for k,v in pairs(hp) do opt[k] = v end
+   
+   if not opt.silent then
+      table.print(opt)
+   end
+
+   -- build dp experiment
+   local xp, ds, hlog = buildExperiment(opt)
+   
+   -- more hyper-parameters
+   hp.seed = xp:randomSeed()
+   hex:setParam(hp)
+   
+   -- meta-data
+   local md = {}
+   md.name = xp:name()
+   md.hostname = os.hostname()
+   md.dataset = torch.type(ds)
+   
+   if not opt.silent then
+      table.print(md)
+   end
+   
+   md.modelstr = tostring(xp:model())
+   hex:setMeta(md)
+
+   -- run the experiment
+   local success, err = pcall(function() xp:run(ds) end )
+   
+   -- results
+   if success then
+      res = {}
+      res.trainCurve = hlog:getResultByEpoch('optimizer:feedback:confusion:accuracy')
+      res.validCurve = hlog:getResultByEpoch('validator:feedback:confusion:accuracy')
+      res.testCurve = hlog:getResultByEpoch('tester:feedback:confusion:accuracy')
+      res.trainAcc = hlog:getResultAtMinima('optimizer:feedback:confusion:accuracy')
+      res.validAcc = hlog:getResultAtMinima('validator:feedback:confusion:accuracy')
+      res.testAcc = hlog:getResultAtMinima('tester:feedback:confusion:accuracy')
+      res.lrs = opt.lrs
+      res.minimaEpoch = hlog.minimaEpoch
+      hex:setResult(res)
+      
+      if not opt.silent then
+         table.print(res)
+      end
+   else
+      print(err)
+   end
+end
+```
 
 ## Query
 
