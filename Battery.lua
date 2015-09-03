@@ -372,7 +372,6 @@ function Battery:exportTable(config)
             if success then
                return rtn
             else
-               print(rtn)
                return false
             end
          end)

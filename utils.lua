@@ -18,6 +18,7 @@ function hypero.writecsv(path, header, data, sep)
    sep = sep or ','
    local file = assert(io.open(path, "w"))
    local nCol = header
+   
    if torch.type(header) == 'table' then
       nCol = #nCol
       data = _.clone(data)
@@ -25,12 +26,10 @@ function hypero.writecsv(path, header, data, sep)
    else
       assert(torch.type(nCol) == 'number')
    end
-   print(#header, header)
+   
    for i=1,#data do
       local row = data[i]
-      if i == 4 or i == 5 or i == 6 then
-         print(nCol, row)
-      end
+      
       for j=1,nCol do
          if j>1 then 
             file:write(sep) 

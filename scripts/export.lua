@@ -20,11 +20,12 @@ cmd:option('--orderBy', 'hexId', "order by this result column")
 cmd:option('--desc', false, 'order is descending')
 cmd:text()
 opt = cmd:parse(arg or {})
-
+opt.asc = not opt.desc
 assert(opt.batteryName ~= '')
 
 conn = hypero.connect{schema=schema}
 bat = conn:battery(opt.batteryName, opt.versionDesc, true, true)
+
 local data, header = bat:exportTable(opt)
 
 if opt.format == 'csv' or opt.format == 'CSV' then
