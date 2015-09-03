@@ -213,4 +213,12 @@ we can use the following command to retrieve our results:
 th scripts/export.lua --batteryName 'Neural Network - Mnist' --versionDesc 'Neural Network v1'
 ```
 
+The resulting `hyper.csv` file will contain all the experiments (one per row), 
+rows ordered by experiment id (`hexId` column). 
+The columns are organized by hyper-parameters, followed by results and finally the meta-data columns :
 
+![](images/csv1.png)
+
+```bash
+th scripts/export.lua --batteryName 'Neural Network - Mnist' --versionDesc 'Neural Network v1' --metaNames 'hostname' --resultNames 'trainAcc,validAcc,testAcc'
+```
