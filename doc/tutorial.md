@@ -80,8 +80,12 @@ to JSON, so only primitive types like `nil`, `string`,
 The above example, we didn't really sample anything. 
 That is because the database (i.e. centralized persistent storage) aspect of the 
 library was separated from the hyper-parameter sampling.
-For sampling you can basically use what you want, 
-but we provide a `Sampler` object with different sampling distribution methods.
+For sampling, we can basically use whatever we want, 
+but hypero provide a `Sampler` object with different sampling distribution methods.
+It's doesn't use anything fancy like a Gaussian Process or anything like that.
+But if you do a good job of bounding and choosing your distributions, 
+you still end up with a really effective *random search*.
+
 Example :
 
 ```lua
@@ -95,11 +99,11 @@ hp.hiddenDepth = hs:randint(1, 7)
 ```
 
 What did we create a `Sampler` class for this? 
-Well you never know, maybe someday, we will have a Sampler 
+Well we never know, maybe someday, we will have a Sampler 
 subclass that will use a Gaussian Process 
 or something to optimize the sampling of hyper-parameters.
 
-Again, if you want to store the hyper-parameters in the database, it's as easy as :
+Again, if we want to store the hyper-parameters in the database, it's as easy as :
 
 ```lua
 hex:setParam(hp)
@@ -112,7 +116,7 @@ a training script that loops over different experiments.
 Each experiment can be logged into the database using `hypero`.
 For a complete example for how this is done, please consult this 
 [example training script](../examples/neuralnetwork.lua).
-The main part of it that is concerned by hypero is this :
+The main part of the script that concerns hypero is this :
 
 ```lua
 ...
@@ -186,8 +190,27 @@ for i=1,hopt.maxHex do
 end
 ```
 
+So basically, for each experiment, sample hyper-parameters, 
+build and run the experiment, and save the hyper-parameters, 
+meta-data and results to the database. 
+If we have multiple GPUs/CPUs, we can launch an instance 
+of the script for each available GPU/CPU, sit back, relax and 
+wait for the results to be logged into the database.
+That is assuming your script is bug-free. 
+When a bug in the code is uncovered (as it inevitably will be), 
+we can just fix it and update the version of the battery before re-running our scripts.
+
 ## Query
 
-You can view the results of your experiments using either the query API or our scripts.
-The scripts make it easy to do common things like view the learning curves of specific experiments, 
-generate a .csv file, order you experiments by results, etc.
+Assuming our training script(s) has been running for a couple of experiments,
+we need a way to query the results from the database. 
+We can use the [export script](../scripts/export.lua) to export our results 
+to CSV format. Assuming, our battery is called `Neural Network - Mnist` and 
+we only care about versions `Neural Network v1` and above, 
+we can use the following command to retrieve our results:
+
+```bash
+th scripts/export.lua --batteryName 'Neural Network - Mnist' --versionDesc 'Neural Network v1'
+```
+
+
