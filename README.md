@@ -8,22 +8,36 @@ hp = require 'hypero'
 conn = hp.connect{database='localhost', username='nicholas'}
 ```
 
-Define a new battery of experiments to run :
+Define a new `Battery` of experiments to run :
 ```lua
-bat = conn:battery("RNN Visual Attenion", "fixed bug in Sequencer")
+batName = "RNN Visual Attenion - MNIST"
+verDesc = "fixed bug in Sequencer"
+bat = conn:battery(batName, verDesc)
 ```
-This allows you to group your experiments by name (in this case "RNN Visual Attention") 
-and to keep track of the different versions of the code you are using.
-The last argument is a description of the changes you made to the last version of code to obtain the new one.
-Each unique tuple of `(battery-name, version-description)` is associated to its own primate key in the database.
-So you can run a battery of experiments from different scripts, processes, threads, etc.
+This allows you to group your experiments into batteries identified by a unique `batName` string. 
+You can also keep track of the different versions of the code you are using by providing a unique `verDesc` string.
+This is a description of the changes you made to the last version of code to obtain the new one.
+Each unique tuple of `(batName, verDesc)` is associated to its own primary key in the database,
+so you can run a battery of experiments from different scripts, processes, threads, etc.
 
-This battery can be used to instantiate new hyper-experiments :
+This battery can be used to instantiate new hyper-experiments:
 ```lua
 hex = bat:experiment()
 ```
+Think of each such experiment as an entry into the hyper-optimization log.
+The entry is divided into 
+```lua
+opt.learningRate = hex:logUniform("lr", math.log(0.00001), math.log(0.1))
+opt.lrDecay = hex:categorical("lr decay", {8,2}, {"linear", "adaptive"})
+if opt.lrDecay == 'linear' then
+	opt.minLR = hex:logUniform("min lr", math.log(opt.learninRate/1000), math.log(opt.learningRate/10))
+	opt.saturateEpoch = hex:normal("saturate", 600, 200)
+else
+	...
+end
+...
+```
 
-Now we can use `hex` to sample some hyper-parameters :
 ```lua
 opt.learningRate = hex:logUniform("lr", math.log(0.00001), math.log(0.1))
 opt.lrDecay = hex:categorical("lr decay", {8,2}, {"linear", "adaptive"})
