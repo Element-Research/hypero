@@ -219,6 +219,16 @@ The columns are organized by hyper-parameters, followed by results and finally t
 
 ![](images/csv1.png)
 
+That is a lot of data. We can filter the data by specifying 
+the columns we would like to include in the CSV using the 
+`--[param,meta,result]Names` cmd-line arguments. 
+While we are at it, we might want to order rows in 
+descending order of the `validAcc` column :
+
 ```bash
-th scripts/export.lua --batteryName 'Neural Network - Mnist' --versionDesc 'Neural Network v1' --metaNames 'hostname' --resultNames 'trainAcc,validAcc,testAcc'
+th scripts/export.lua --batteryName 'Neural Network - Mnist' --versionDesc 'Neural Network v1' --metaNames 'hostname' --resultNames 'trainAcc,validAcc,testAcc' --orderBy 'validAcc' --desc
 ```
+
+The resulting `hyper.csv` file looks much better don't you think?
+
+![](images/csv2.png)
