@@ -2,6 +2,7 @@
 
 Simple distributed hyper-optimization library for torch7 :
 
- * [Installation](install.md)
- * [Tutorial](tutorial.md)
+ * [Installation](doc/install.md)
+ * [Tutorial](doc/tutorial.md)
+ * [Example](examples/neuralnetwork.lua)
 
