@@ -29,10 +29,6 @@ dependencies = {
    "luasql-postgres"
 }
 
-external_dependencies = {
-  PGSQL = {
-}
-
 build = {
    type = "command",
    build_command = [[
