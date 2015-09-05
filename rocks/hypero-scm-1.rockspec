@@ -25,9 +25,13 @@ dependencies = {
    "luafilesystem >= 1.6.2",
    "sys >= 1.1",
    "torchx >= 1.0",
-   "luajson"
+   "luajson",
+   "luasql-postgres"
 }
 
+external_dependencies = {
+  PGSQL = {
+}
 
 build = {
    type = "command",
