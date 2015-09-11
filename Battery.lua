@@ -361,9 +361,15 @@ function Battery:exportTable(config)
       local colIdx = _.find(colNames, orderBy)
       assert(colIdx, "unknown orderBy column name")
       _.sort(tbl, function(rowA, rowB) 
-            valA, valB = rowA[colIdx], rowB[colIdx]
+            local valA, valB = rowA[colIdx], rowB[colIdx]
             local success, rtn = pcall(function()
-                  if asc then
+                  if valA == nil and valB == nil then
+                     return false
+                  elseif valA == nil then
+                     return false
+                  elseif valB == nil then
+                     return true
+                  elseif asc then
                      return valA < valB
                   else
                      return valA > valB
