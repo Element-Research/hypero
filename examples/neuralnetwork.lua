@@ -17,7 +17,7 @@ cmd:option('--minLR', '{0.001,1}', 'minimum LR = minLR*startLR (log-uniform {log
 cmd:option('--satEpoch', '{300, 150}', 'epoch at which linear decayed LR will reach minLR*startLR (normal {mean, std})')
 cmd:option('--maxOutNorm', '{1,3,4,2}', 'max norm each layers output neuron weights (categorical)')
 cmd:option('--momentum', '{4,4,2}', 'momentum (categorical)')
-cmd:option('--hiddenDepth', '{0,7}', 'number of hidden layers (log-uniform {log(min), log(max)})')
+cmd:option('--hiddenDepth', '{0,7}', 'number of hidden layers (randint {min, max})')
 cmd:option('--hiddenSize', '{128,1024}', 'number of hidden units per layer (log-uniform {log(min), log(max)})')
 cmd:option('--batchSize', '{1,4,1}', 'number of examples per batch (categorical)')
 cmd:option('--extra', '{1,1,1}', 'apply nothing, dropout or batchNorm (categorical)')
